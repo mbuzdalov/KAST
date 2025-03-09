@@ -1,18 +1,15 @@
-#include <ranges>
+#ifndef __KAST_DISTANCE_TESTS_H__
+#define __KAST_DISTANCE_TESTS_H__
+
 #include <vector>
-#include <iostream>
 
 #include <seqan3/alphabet/all.hpp>
+#include <seqan3/core/debug_stream.hpp>
 
 #include "distance.h"
 #include "utils.h"
 
 using namespace seqan3::literals;
-
-template<typename T, typename R>
-void append_range(std::vector<T> &destination, R const &range) {
-    destination.insert(destination.end(), range.begin(), range.end());
-}
 
 /*
    Prep the query and reference sequences and perform counts
@@ -22,15 +19,8 @@ void prep(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts, un
    std::vector<seqan3::dna5> qryseq { "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG"_dna5 };
    std::vector<seqan3::dna5> refseq { "CGGAGACCTCCGTGGACGGGGAAGTCCTGCGCGGGTCAGACGTACGCCCCGATTAGTTGCCCGGACGCCCGGTTGGCAGAAGTGACGGCGACTGCCCTCA"_dna5 };
 
-   // TODO: reverse-complementing onto itself should possibly be doable without copying,
-   // and possibly be contained in utils
-   std::vector<seqan3::dna5> qryseqrc = qryseq;
-   append_range(qryseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
-   append_range(qryseq, qryseqrc | std::views::reverse | seqan3::views::complement);
-
-   std::vector<seqan3::dna5> refseqrc = refseq;
-   append_range(refseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
-   append_range(refseq, refseqrc | std::views::reverse | seqan3::views::complement);
+   prepare_sequence_inplace(qryseq, k);
+   prepare_sequence_inplace(refseq, k);
 
    count_kmers(qrycounts, qryseq, k);
    count_kmers(refcounts, refseq, k);
@@ -43,15 +33,8 @@ void prep(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts,
    std::vector<seqan3::dna5> qryseq { "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG"_dna5 };
    std::vector<seqan3::dna5> refseq { "CGGAGACCTCCGTGGACGGGGAAGTCCTGCGCGGGTCAGACGTACGCCCCGATTAGTTGCCCGGACGCCCGGTTGGCAGAAGTGACGGCGACTGCCCTCA"_dna5 };
 
-   // TODO: reverse-complementing onto itself should possibly be doable without copying
-   // and possibly be contained in utils
-   std::vector<seqan3::dna5> qryseqrc = qryseq;
-   append_range(qryseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
-   append_range(qryseq, qryseqrc | std::views::reverse | seqan3::views::complement);
-
-   std::vector<seqan3::dna5> refseqrc = refseq;
-   append_range(refseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
-   append_range(refseq, refseqrc | std::views::reverse | seqan3::views::complement);
+   prepare_sequence_inplace(qryseq, k);
+   prepare_sequence_inplace(refseq, k);
 
    count_kmers(qrycounts, qryseq, k);
    count_kmers(refcounts, refseq, k);
@@ -308,3 +291,5 @@ void tests_prep_raa_6() {
     FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 1, 0.0001);
     FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.00869565, 0.0001);
 }
+
+#endif //__KAST_DISTANCE_TESTS_H__
