@@ -114,7 +114,7 @@ void prep_raa(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts
     double found_val = found; \
     if (found_val < expected - eps || found_val > expected + eps) { \
         seqan3::debug_stream << "Test " << __func__ << "/" << #found << " failed: expected " << expected << " found " << found_val << std::endl; \
-        /*exit(1);*/ \
+        exit(1); \
     } else { \
         seqan3::debug_stream << "Test " << __func__ << "/" << #found << " OK" << std::endl; \
     } \
