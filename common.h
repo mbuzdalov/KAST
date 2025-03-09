@@ -35,4 +35,4 @@ struct modify_string_options
    int64_t filter_bp = 0;
 };
 
-#endif
+#endif // __KAST_COMMON_H__
