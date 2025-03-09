@@ -276,6 +276,14 @@ bool parse_command_line(modify_string_options &options, int argc, char const ** 
 }
 
 /*
+ * Returns the index of a char, assuming it is from the specified alphabet.
+ */
+template <seqan3::writable_alphabet T>
+unsigned rank_of_char_as(char ch) {
+    return seqan3::assign_char_to(ch, T{}).to_rank();
+}
+
+/*
 I need to check that if we are using skip-mers, then we need to check that these are sensible.
   * skip-mer mask must all be 0/1's
   * skip-mer mask should be the same number of characters as the kmer size
@@ -320,16 +328,21 @@ bool parse_mask(modify_string_options const &options, int &effective_klen) {
    return true;
 };
 
+
 template <class T>
-int safe_increment(T& value) {
-   if (value < std::numeric_limits<T>::max()) {
-      value++;
-      return 0;
-   } else {
-      seqan3::debug_stream << "Error: Integer overflow detected. Exiting" << std::endl;
-      return 1;
-   }
-};
+void safe_increment_impl(std::vector<T> &destination, size_t index, char const *file, unsigned line) {
+    if (index >= destination.size()) {
+        seqan3::debug_stream << "File " << file << " line " << line << ": Error: Index too large (" << index << " out of " << destination.size() << ")" << std::endl;
+        exit(1);
+    } else if (destination[index] < std::numeric_limits<T>::max()) {
+        ++destination[index];
+    } else {
+        seqan3::debug_stream << "File " << file << " line " << line << ": Error: Integer overflow detected. Exiting" << std::endl;
+        exit(1);
+    }
+}
+
+#define safe_increment(dest, index) safe_increment_impl(dest, index, __FILE__, __LINE__)
 
 template <seqan3::nucleotide_alphabet T>
 double gc_ratio(std::vector<T> const &sequence) {
@@ -338,10 +351,10 @@ double gc_ratio(std::vector<T> const &sequence) {
    for (auto symbol : sequence) {
       ++count[symbol.to_rank()];
    }
-   double gc = count[seqan3::assign_char_to('G', T{}).to_rank()]
-             + count[seqan3::assign_char_to('C', T{}).to_rank()];
-   double at = count[seqan3::assign_char_to('A', T{}).to_rank()]
-             + count[seqan3::assign_char_to('T', T{}).to_rank()];
+   double gc = count[rank_of_char_as<T>('G')]
+             + count[rank_of_char_as<T>('C')];
+   double at = count[rank_of_char_as<T>('A')]
+             + count[rank_of_char_as<T>('T')];
    return gc / (gc + at);
 }
 
@@ -361,7 +374,7 @@ void count_kmers(std::vector<unsigned> &kmer_counts, std::vector<T> const &seque
 
    auto hash_view = sequence | seqan3::views::kmer_hash(my_shape);
    for (auto hash : hash_view) {
-      safe_increment(kmer_counts[hash]);
+      safe_increment(kmer_counts, hash);
    }
 };
 
@@ -389,7 +402,7 @@ void count_kmers(std::vector<unsigned> & kmer_counts, std::vector<seqan3::dna5> 
          banned_bits |= 1;
       } else {
          // this makes all indexing compatible to dna4
-         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+         curr_hash += rank_of_char_as<seqan3::dna4>(base);
       }
    }
 
@@ -401,9 +414,9 @@ void count_kmers(std::vector<unsigned> & kmer_counts, std::vector<seqan3::dna5> 
          banned_bits |= 1;
       } else {
          // this makes all indexing compatible to dna4
-         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+         curr_hash += rank_of_char_as<seqan3::dna4>(base);
       }
-      if (!banned_bits) safe_increment(kmer_counts[curr_hash]);
+      if (!banned_bits) safe_increment(kmer_counts, curr_hash);
    }
 };
 
@@ -424,12 +437,25 @@ void count_kmers(std::vector<unsigned> &kmer_counts,
 
    for (std::string const &mask : masks) {
       seqan3::bin_literal bin;
+      bin.value = 0;
       for (size_t i = 0; i < mask.length(); ++i) {
          if (mask[i] == '1') bin.value |= size_t(1) << i;
       }
-      auto hash_view = sequence | seqan3::views::kmer_hash(seqan3::shape(bin));
+      // Here the thing is.
+      //
+      // KAST assumes that masks are masking out k-mers, that is, if the mask ends in zeros,
+      // we do not have a permission to move the mask so that these zeros fall off the sequence.
+      //
+      // seqan3, on the other hand, does not allow expressing this in its shapes.
+      // So we have to cut the sequence from the end if our mask has zeros at the end.
+
+      // TODO: the current implementation will likely fail if a mask starts with a zero,
+      // because shape creation will fail.
+
+      size_t new_size = sequence.size() - k + std::bit_width(bin.value);
+      auto hash_view = sequence | std::views::take(new_size) | seqan3::views::kmer_hash(seqan3::shape(bin));
       for (auto hash : hash_view) {
-         safe_increment(kmer_counts[hash]);
+         safe_increment(kmer_counts, hash);
       }
    }
 };
@@ -454,7 +480,10 @@ void count_kmers(std::vector<unsigned> &kmer_counts,
    for (std::string const &mask : masks) {
       uint32_t bin = 0;
       for (size_t i = 0; i < mask.length(); ++i) {
-         if (mask[i] == '1') bin |= 1 << i;
+         // we have these masks reversed here,
+         // because they are not used through seqan3 mask API,
+         // but in a custom way which wants the opposite order.
+         if (mask[i] == '1') bin |= 1 << (mask.length() - 1 - i);
       }
       parsed_masks.push_back(bin);
    }
@@ -467,7 +496,7 @@ void count_kmers(std::vector<unsigned> &kmer_counts,
          banned_bits |= 1;
       } else {
          // this makes all indexing compatible to dna4
-         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+         curr_hash += rank_of_char_as<seqan3::dna4>(base);
       }
    }
 
@@ -486,7 +515,7 @@ void count_kmers(std::vector<unsigned> &kmer_counts,
          banned_bits |= 1;
       } else {
          // this makes all indexing compatible to dna4
-         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+         curr_hash += rank_of_char_as<seqan3::dna4>(base);
       }
       if (!banned_bits) {
          for (uint32_t mask : parsed_masks) {
@@ -500,7 +529,7 @@ void count_kmers(std::vector<unsigned> &kmer_counts,
                mask >>= 1;
                copy_hash >>= 2;
             }
-            safe_increment(kmer_counts[copy_hash]);
+            safe_increment(kmer_counts, result);
          }
       }
    }
@@ -628,7 +657,7 @@ int countReducedAlphabet(String<unsigned> & kmerCounts, String<TAlphabet> const 
       //cout << seqan::unhash(meh, seqan::hash(myShape, itSequence), itSequence) << endl;
       long long unsigned int hashValue = seqan2::hash(myShape, itSequence);
 
-      safe_increment(kmerCounts[hashValue]);
+      safe_increment(kmerCounts, hashValue);
    }
    return 0;
 };

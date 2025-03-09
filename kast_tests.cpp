@@ -1,7 +1,11 @@
 #include "distance_tests.h"
-//#include "utils_tests.h"
+#include "utils_tests.h"
 
 int main() {
+    dna5_masked_single_bit();
+    aa_masked_single_bit();
+    raa_masked_single_bit();
+
     tests_prep_dna_3();
     tests_prep_dna_5();
     tests_prep_dna_7();

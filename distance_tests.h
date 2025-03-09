@@ -111,9 +111,10 @@ void prep_raa(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts
 /////////////////////////////////////////////////////////
 
 #define FAIL_IF_NOT_WITHIN(found, expected, eps) { \
-    double found_val = found; \
-    if (found_val < expected - eps || found_val > expected + eps) { \
-        seqan3::debug_stream << "Test " << __func__ << "/" << #found << " failed: expected " << expected << " found " << found_val << std::endl; \
+    auto expected_val = expected; \
+    auto found_val = found; \
+    if (found_val < expected_val - eps || found_val > expected_val + eps) { \
+        seqan3::debug_stream << "Test " << __func__ << "/" << #found << " failed: expected " << expected_val << " found " << found_val << std::endl; \
         exit(1); \
     } else { \
         seqan3::debug_stream << "Test " << __func__ << "/" << #found << " OK" << std::endl; \

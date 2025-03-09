@@ -1,134 +1,70 @@
+#include <algorithm>
+#include <seqan3/alphabet/all.hpp>
 #include "utils.h"
 
-using namespace seqan2;
-using namespace std;
+using namespace seqan3::literals;
 
-SEQAN_DEFINE_TEST(count_dna)
-{
-
+#define FAIL_IF_NOT_EQUAL(expected, found) { \
+    auto found_val = found; \
+    auto expected_val = expected; \
+    if (found_val != expected_val) { \
+        seqan3::debug_stream << "Test " << __func__ << "/" << #found << ": expected " << expected_val << " found " << found_val << std::endl; \
+        exit(1); \
+    } else { \
+        seqan3::debug_stream << "Test " << __func__ << "/" << #found << " OK" << std::endl; \
+    } \
 }
 
-SEQAN_DEFINE_TEST(mask_count_dna)
-{
-   String<Dna5> seq = "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG";
-   String<unsigned> counts;
-   int klen = 5;
-   int effectiveLength = 1;
-   vector<CharString> mask;
-   mask.push_back("10000");
-   countKmersNew(counts, seq, klen, effectiveLength, mask);
+void dna5_masked_single_bit() {
+    auto seq = "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG"_dna5;
+    std::vector<unsigned> counts;
+    std::vector<std::string> masks { "10000" };
 
-   /*
-   Result should be;
-   A = 21
-   C = 24
-   G = 33
-   T = 18
-   */
+    count_kmers(counts, seq, 5, 1, masks);
 
-   /*Set up a results kmer counts with the known result*/
-   String<unsigned> kmerCounts;
-   Shape<Dna> myShape;
-   resize(myShape, effectiveLength);
-   int kmerNumber = _intPow((unsigned)ValueSize<Dna>::VALUE, weight(myShape));
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
-   kmerCounts[0] = 21;
-   kmerCounts[1] = 24;
-   kmerCounts[2] = 33;
-   kmerCounts[3] = 18;
-
-   for(int i = 0; i < length(counts); i++)
-   {
-      SEQAN_ASSERT_EQ(kmerCounts[i], counts[i]);
-   }
+    FAIL_IF_NOT_EQUAL(4, counts.size());
+    FAIL_IF_NOT_EQUAL(21, counts[rank_of_char_as<seqan3::dna4>('A')]);
+    FAIL_IF_NOT_EQUAL(24, counts[rank_of_char_as<seqan3::dna4>('C')]);
+    FAIL_IF_NOT_EQUAL(33, counts[rank_of_char_as<seqan3::dna4>('G')]);
+    FAIL_IF_NOT_EQUAL(18, counts[rank_of_char_as<seqan3::dna4>('T')]);
 }
 
-SEQAN_DEFINE_TEST(mask_count_raa)
-{
-   String<ReducedAminoAcidMurphy10> seq = "MVLTIYPDELVQIVS";
-   String<unsigned> counts;
-   int klen = 5;
-   int effectiveLength = 1;
-   vector<CharString> mask;
-   mask.push_back("10000");
-   countKmersNew(counts, seq, klen, effectiveLength, mask);
+void aa_masked_single_bit() {
+    auto seq = "MVLTIYPDELVQIVS"_aa27;
+    std::vector<unsigned> counts;
+    std::vector<std::string> masks { "10000" };
 
-   String<unsigned> kmerCounts;
-   Shape<ReducedAminoAcidMurphy10> myShape;
-   resize(myShape, effectiveLength);
-   int kmerNumber = _intPow((unsigned)ValueSize<ReducedAminoAcidMurphy10>::VALUE, weight(myShape));
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
+    count_kmers(counts, seq, 5, 1, masks);
 
-   kmerCounts[0] = 0;
-   kmerCounts[1] = 2;
-   kmerCounts[2] = 0;
-   kmerCounts[3] = 1;
-   kmerCounts[4] = 0;
-   kmerCounts[5] = 0;
-   kmerCounts[6] = 6;
-   kmerCounts[7] = 0;
-   kmerCounts[8] = 1;
-   kmerCounts[9] = 1;
-
-   for(unsigned int i = 0; i < length(counts); i++)
-   {
-      SEQAN_ASSERT_EQ(kmerCounts[i], counts[i]);
-//      String<ReducedAminoAcidMurphy10> orig;
-//      unhash(orig, i, effectiveLength);
-//      cout << orig << "\t" << counts[i] << endl;
-//     cout << "kmerCounts[" << i << "] = " << counts[i] << ";" << endl;
-   }
+    FAIL_IF_NOT_EQUAL(27, counts.size());
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('M')]);
+    FAIL_IF_NOT_EQUAL(2, counts[rank_of_char_as<seqan3::aa27>('V')]);
+    FAIL_IF_NOT_EQUAL(2, counts[rank_of_char_as<seqan3::aa27>('L')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('T')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('I')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('Y')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('P')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('D')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa27>('E')]);
+    FAIL_IF_NOT_EQUAL(27 - 9, std::count(counts.begin(), counts.end(), 0));
 }
 
-SEQAN_DEFINE_TEST(mask_count_aa)
-{
-   String<AminoAcid> seq = "MVLTIYPDELVQIVS";
-   String<unsigned> counts;
-   int klen = 5;
-   int effectiveLength = 1;
-   vector<CharString> mask;
-   mask.push_back("10000");
-   countKmersNew(counts, seq, klen, effectiveLength, mask);
+void raa_masked_single_bit() {
+    auto seq = "MVLTIYPDELVQIVS"_aa10murphy;
+    std::vector<unsigned> counts;
+    std::vector<std::string> masks { "10000" };
 
-   String<unsigned> kmerCounts;
-   Shape<ReducedAminoAcidMurphy10> myShape;
-   resize(myShape, effectiveLength);
-   int kmerNumber = _intPow((unsigned)ValueSize<AminoAcid>::VALUE, weight(myShape));
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
+    count_kmers(counts, seq, 5, 1, masks);
 
-   kmerCounts[0] = 0;
-   kmerCounts[1] = 0;
-   kmerCounts[2] = 0;
-   kmerCounts[3] = 1;
-   kmerCounts[4] = 1;
-   kmerCounts[5] = 0;
-   kmerCounts[6] = 0;
-   kmerCounts[7] = 0;
-   kmerCounts[8] = 1;
-   kmerCounts[9] = 0;
-   kmerCounts[10] = 0;
-   kmerCounts[11] = 2;
-   kmerCounts[12] = 1;
-   kmerCounts[13] = 0;
-   kmerCounts[14] = 0;
-   kmerCounts[15] = 1;
-   kmerCounts[16] = 0;
-   kmerCounts[17] = 0;
-   kmerCounts[18] = 0;
-   kmerCounts[19] = 1;
-   kmerCounts[20] = 0;
-   kmerCounts[21] = 2;
-   kmerCounts[22] = 0;
-   kmerCounts[23] = 1;
-   kmerCounts[24] = 0;
-   kmerCounts[25] = 0;
-   kmerCounts[26] = 0;
-
-   for(int i = 0; i < length(counts); i++)
-   {
-      SEQAN_ASSERT_EQ(kmerCounts[i], counts[i]);
-   }
+    FAIL_IF_NOT_EQUAL(10, counts.size());
+    FAIL_IF_NOT_EQUAL(0, counts[rank_of_char_as<seqan3::aa10murphy>('A')]);
+    FAIL_IF_NOT_EQUAL(2, counts[rank_of_char_as<seqan3::aa10murphy>('B')]);
+    FAIL_IF_NOT_EQUAL(0, counts[rank_of_char_as<seqan3::aa10murphy>('C')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa10murphy>('F')]);
+    FAIL_IF_NOT_EQUAL(0, counts[rank_of_char_as<seqan3::aa10murphy>('G')]);
+    FAIL_IF_NOT_EQUAL(0, counts[rank_of_char_as<seqan3::aa10murphy>('H')]);
+    FAIL_IF_NOT_EQUAL(6, counts[rank_of_char_as<seqan3::aa10murphy>('I')]);
+    FAIL_IF_NOT_EQUAL(0, counts[rank_of_char_as<seqan3::aa10murphy>('K')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa10murphy>('P')]);
+    FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa10murphy>('S')]);
 }
