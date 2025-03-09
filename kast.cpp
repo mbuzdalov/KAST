@@ -1,128 +1,58 @@
 /*
-KAST - Kmer Alignment-free Search Tool
-Version 1.0.2
-Written by Dr. Martin Vickers (martin.vickers@jic.ac.uk)
+ * KAST - Kmer Alignment-free Search Tool
+ * Version 1.0.3beta
+ * Original version by Dr. Martin Vickers (martin.vickers@jic.ac.uk)
+ * Current version rewritten for seqan3 by Dr. Maxim Buzdalov (mab168@aber.ac.uk)
+ */
 
-*/
+#include <seqan3/core/debug_stream.hpp>
 
-#include <iostream>
-#include <seqan/sequence.h>
-#include <seqan/stream.h>
-#include <seqan/file.h>
-#include <seqan/arg_parse.h>
-#include <seqan/seq_io.h>
-#include <math.h>
-#include <string>
-#include <thread>
-#include <seqan/reduced_aminoacid.h>
 #include "common.h"
 #include "utils.h"
 #include "pairwise.h"
 #include "search.h"
 
-using namespace seqan2;
-using namespace std;
+template <seqan3::writable_alphabet T>
+int templated_main(modify_string_options const &options) {
+    if (options.pairwise_filename != "" && options.type != "all" && options.type != "new") {
+        // Running in pairwise mode
+        return pairwise_matrix<T>(options);
+    } else if (options.pairwise_filename != "" && options.type == "all")  {
+        // Running in pairwise all mode
+        return pairwise_all_matrix<T>(options);
+    } else if (options.interleaved_filename != "") {
+        // Running in interleaved mode
+        return interleaved<T>(options);
+    } else if (options.reference_filename != "" && options.query_filename != "") {
+        return query_ref_search<T>(options);
+    } else {
+        seqan3::debug_stream << "Error: unknown configuration!" << std::endl;
+        return 1;
+    }
+}
 
-int main(int argc, char const ** argv)
-{
-   // parse our options
-   ModifyStringOptions options;
-   ArgumentParser::ParseResult res = parseCommandLine(options, argc, argv);
-   if (res != ArgumentParser::PARSE_OK)
-      return res == ArgumentParser::PARSE_ERROR;
+int main(int argc, char const ** argv) {
+    // parse our options
+    modify_string_options options;
+    if (!parse_command_line(options, argc, argv)) {
+        return 1;
+    }
 
-   // parse the mask so we know the kmer size
-   options.effectiveLength = options.klen;
-   if(parseMask(options, options.effectiveLength) == 1)
-      return 1;
+    // parse the mask so we know the kmer size
+    options.effective_length = options.klen;
+    if (!parse_mask(options, options.effective_length)) {
+        return 1;
+    }
 
-   // Running in pairwise mode
-   if(options.pairwiseFileName != NULL && options.type != "all" && options.type != "new")
-   {
-      if(options.sequenceType == "aa")
-      {
-         pairwise_matrix(options, AminoAcid());
-      }
-      else if(options.sequenceType == "raa")
-      {
-         pairwise_matrix(options, ReducedAminoAcidMurphy10());
-      }
-      else if(options.sequenceType == "dna")
-      {
-         pairwise_matrix(options, Dna5());
-      }
-      else
-      {
-         // there is no other mode
-         cerr << "Error: mode not found - " << options.sequenceType << endl;
-         return 1;
-      }
-   }
-   // Running in pairwise all mode
-   else if(options.pairwiseFileName != NULL && options.type == "all")
-   {
-      if(options.sequenceType == "aa")
-      {
-         pairwise_all_matrix(options, AminoAcid());
-      }
-      else if(options.sequenceType == "raa")
-      {
-         pairwise_all_matrix(options, ReducedAminoAcidMurphy10());
-      }
-      else if(options.sequenceType == "dna")
-      {
-         pairwise_all_matrix(options, Dna5());
-      }
-      else
-      {
-         // there is no other mode
-         cerr << "Error: mode not found - " << options.sequenceType << endl;
-         return 1;
-      }
-   }
-   // Running in interleaved mode
-   else if(options.interleavedFileName != NULL)
-   {
-      if(options.sequenceType == "aa")
-      {  
-         interleaved(options, AminoAcid());
-      }
-      else if(options.sequenceType == "raa")
-      {  
-         interleaved(options, ReducedAminoAcidMurphy10());
-      }
-      else if(options.sequenceType == "dna")
-      {  
-         interleaved(options, Dna5());
-      }
-      else
-      {
-         // there is no other mode
-         cerr << "Error: mode not found - " << options.sequenceType << endl;
-         return 1;
-      }
-   }
-   else if (options.referenceFileName != NULL && options.queryFileName != NULL)
-   {
-      if(options.sequenceType == "aa")
-      {
-         query_ref_search(options, AminoAcid());
-      }
-      else if(options.sequenceType == "raa")
-      {
-         query_ref_search(options, ReducedAminoAcidMurphy10());
-      }
-      else if(options.sequenceType == "dna")
-      {
-         query_ref_search(options, Dna5());
-      }
-      else
-      {
-         // there is no other mode
-         cerr << "Error: mode not found - " << options.sequenceType << endl;
-         return 1;
-      }
-   }
-
-   return 0;
+    // dispatch the further work based on the sequence type
+    if (options.sequence_type == "aa") {
+        return templated_main<seqan3::aa27>(options);
+    } else if (options.sequence_type == "raa") {
+        return templated_main<seqan3::aa10murphy>(options);
+    } else if (options.sequence_type == "dna") {
+        return templated_main<seqan3::dna5>(options);
+    } else {
+        seqan3::debug_stream << "Error: sequence type not found (" << options.sequence_type << ")" << std::endl;
+        return 1;
+    }
 }
