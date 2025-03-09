@@ -197,10 +197,10 @@ double euler(std::vector<unsigned> const &kmerCounts1,
    {
       double rF = kmerCounts1[i] / (double) (rN);
       double qF = kmerCounts2[i] / (double) (qN);
-      score = score + pow((rF - qF), 2); // TODO: (rF - qF) * (rF - qF)?
+      score = score + (rF - qF) * (rF - qF); // used to be pow((rF - qF), 2);
    }
 
-   return pow(score, 0.5); // TODO: sqrt?
+   return sqrt(score); // used to be pow(score, 0.5);
 }
 
 double bray_curtis_distance(std::vector<unsigned> const &kmerCounts1,
