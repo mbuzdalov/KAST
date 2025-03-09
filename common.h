@@ -1,41 +1,35 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef __KAST_COMMON_H__
+#define __KAST_COMMON_H__
 
-#include <seqan/sequence.h>
-#include <seqan/reduced_aminoacid.h>
-
-using namespace seqan2;
-using namespace std;
-
-typedef SimpleType<unsigned char, ReducedAminoAcid_<Murphy10> > ReducedAminoAcidMurphy10;
+#include <string>
 
 /*
 User defined options struct
 */
-struct ModifyStringOptions
+struct modify_string_options
 {
    int klen;
    int nohits;
-   int markovOrder;
-   CharString type;
-   CharString sequenceType;
-   CharString output_format;
+   int markov_order;
+   std::string type;
+   std::string sequence_type;
+   std::string output_format;
    bool noreverse;
    bool calcgc;
    bool noheader;
-   CharString queryFileName = NULL;
-   CharString referenceFileName = NULL;
-   CharString pairwiseFileName = NULL;
-   CharString interleavedFileName = NULL;
+   std::string query_filename;
+   std::string reference_filename;
+   std::string pairwise_filename;
+   std::string interleaved_filename;
    int num_threads;
    bool debug;
    bool lowram;
    bool phylyp = true;
    bool tabout;
    bool blastlike;
-   CharString outputFileName = NULL;
-   vector<CharString> mask;
-   int effectiveLength;
+   std::string output_filename;
+   std::vector<std::string> mask;
+   int effective_length;
    double score_cutoff;
    double filter_percent = 0;
    int64_t filter_bp = 0;

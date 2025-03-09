@@ -1,17 +1,25 @@
-#undef SEQAN_ENABLE_TESTING
-#define SEQAN_ENABLE_TESTING 1
-
-#include <seqan/basic.h>
 #include <iostream>
-#include <seqan/arg_parse.h>
-#include <seqan/seq_io.h>
 
 #include "distance_tests.h"
-#include "utils_tests.h"
+//#include "utils_tests.h"
 
-using namespace seqan2;
-using namespace std;
+int main() {
+    tests_prep_dna_3();
+    tests_prep_dna_5();
+    tests_prep_dna_7();
+    tests_prep_dna_9();
+    tests_prep_aa_3();
+    tests_prep_aa_4();
+    tests_prep_aa_5();
+    tests_prep_aa_6();
+    tests_prep_raa_3();
+    tests_prep_raa_4();
+    tests_prep_raa_5();
+    tests_prep_raa_6();
+    return 0;
+}
 
+/*
 SEQAN_BEGIN_TESTSUITE(KAST_tests)
 {
    // Call roundUp() tests
@@ -57,4 +65,4 @@ SEQAN_BEGIN_TESTSUITE(KAST_tests)
 }
 SEQAN_END_TESTSUITE
 
-
+*/

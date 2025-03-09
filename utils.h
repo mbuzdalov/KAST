@@ -1,370 +1,410 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef __KAST_UTILS_H__
+#define __KAST_UTILS_H__
 
 #include "common.h"
 
-#include <seqan/seq_io.h>
-#include <seqan/arg_parse.h>
-#include <seqan/index.h>
+#include <array>
+#include <numeric>
+#include <vector>
 #include <unordered_map>
 
+#include <seqan3/alphabet/all.hpp>
+#include <seqan3/argument_parser/all.hpp>
+#include <seqan3/core/debug_stream.hpp>
+#include <seqan3/search/kmer_index/shape.hpp>
+#include <seqan3/search/views/kmer_hash.hpp>
+#include <seqan3/utility/math.hpp>
+#include <seqan3/utility/views/all.hpp>
+
 // Parse our commandline options
-ArgumentParser::ParseResult parseCommandLine(ModifyStringOptions & options,
-                                             int argc, char const ** argv)
-{
-   ArgumentParser parser("kast");
-   addOption(parser, ArgParseOption("k", "klen", "Kmer Length.",
-                                    ArgParseArgument::INTEGER, "INT"));
-   setDefaultValue(parser, "klen", "3");
-   addOption(parser, ArgParseOption("d", "debug", "Debug Messages."));
-   addOption(parser, ArgParseOption("q", "query-file",
-                                    "Path to the file containing your query \
-                                    sequence data.\n",
-                                    ArgParseArgument::INPUT_FILE, "IN"));
-   addOption(parser, ArgParseOption("r", "reference-file",
-                                    "Path to the file containing your reference\
-                                     sequence data.",
-                                     ArgParseArgument::INPUT_FILE, "IN"));
-   addOption(parser, ArgParseOption("p", "pairwise-file",
-                                    "Path to the file containing your sequence \
-                                    data which you will perform pairwise \
-                                    comparison on.",
-                                    ArgParseArgument::INPUT_FILE, "IN"));
-   addOption(parser, ArgParseOption("i", "interleaved-file",
-                                    "Path to the file containing your sequence \
-                                    data which is interleaved.",
-                                    ArgParseArgument::INPUT_FILE, "IN"));
-   addOption(parser, ArgParseOption("m", "markov-order", "Markov Order",
-             ArgParseArgument::INTEGER, "INT"));
-   addOption(parser, ArgParseOption("o", "output-file", "Output file.",
-             ArgParseArgument::OUTPUT_FILE, "OUT"));
+bool parse_command_line(modify_string_options &options, int argc, char const ** argv) {
+   seqan3::argument_parser parser{"kast", argc, argv};
+   parser.info.version = "1.0.3beta";
+   parser.info.date = "Mar 2025";
+   //parser.short_description = "Kmer Alignment-free Search Tool";
+   parser.add_line("Perform Alignment-free k-tuple frequency comparisons from sequences.");
+   parser.add_line("This can be in the form of two input files (e.g. a reference and a query):");
+   parser.add_line("   -q query.fasta -r reference.fasta -o results.txt [\\fIOPTIONS\\fP] ");
+   parser.add_line("or a single file for pairwise comparisons to be made:");
+   parser.add_line("   -p mydata.fasta -o results.txt [\\fIOPTIONS\\fP] ");
 
-   setDefaultValue(parser, "markov-order", "0");
-   addOption(parser, ArgParseOption("n", "num-hits",
-             "Number of top hits to return when running a Ref/Query search.\
-              If you want all the result, enter 0.", ArgParseArgument::INTEGER, "INT"));
-   setDefaultValue(parser, "num-hits", "10");
-   addOption(parser, ArgParseOption("t", "distance-type",
-                                    "The method of calculating the distance \
-                                    between two sequences. For descriptions of \
-                                    distance please refer to the wiki. ",
-                                    ArgParseArgument::STRING, "STR"));
-   setValidValues(parser, "distance-type",
-                  "d2 euclid d2s d2star manhattan chebyshev dai bc ngd all canberra normalised_canberra cosine");
-   //            "d2 euclid d2s D2S d2s-opt d2star D2Star manhattan chebyshev hao dai bc ngd all new");
-   setDefaultValue(parser, "distance-type", "d2");
-   addOption(parser, ArgParseOption("sc", "score-cutoff", "Score Cutoff for search mode.",
-             ArgParseArgument::DOUBLE, "DOUBLE"));
-   if(isSet(parser, "score-cutoff") == false)
+   //addOption(parser, ArgParseOption("k", "klen", "Kmer Length.",
+   //                                 ArgParseArgument::INTEGER, "INT"));
+   //setDefaultValue(parser, "klen", "3");
+   //getOptionValue(options.klen, parser, "klen");
+   options.klen = 3; //default
+   parser.add_option(options.klen, 'k', "klen", "Kmer Length");
+
+   //addOption(parser, ArgParseOption("d", "debug", "Debug Messages."));
+   //options.debug = isSet(parser, "debug");
+   options.debug = false;
+   parser.add_flag(options.debug, 'd', "debug", "Debug Messages");
+
+   //addOption(parser, ArgParseOption("q", "query-file",
+   //                                 "Path to the file containing your query \
+   //                                 sequence data.\n",
+   //                                 ArgParseArgument::INPUT_FILE, "IN"));
+   //getOptionValue(options.queryFileName, parser, "query-file");
+   options.query_filename = "";
+   parser.add_option(options.query_filename, 'q', "query-file",
+        "Path to the file containing your query sequence data");
+
+   //addOption(parser, ArgParseOption("r", "reference-file",
+   //                                 "Path to the file containing your reference\
+   //                                  sequence data.",
+   //                                  ArgParseArgument::INPUT_FILE, "IN"));
+   //getOptionValue(options.referenceFileName, parser, "reference-file");
+   options.reference_filename = "";
+   parser.add_option(options.reference_filename, 'r', "reference-file",
+        "Path to the file containing your reference sequence data");
+
+   //addOption(parser, ArgParseOption("p", "pairwise-file",
+   //                                 "Path to the file containing your sequence \
+   //                                 data which you will perform pairwise \
+   //                                 comparison on.",
+   //                                 ArgParseArgument::INPUT_FILE, "IN"));
+   //getOptionValue(options.pairwiseFileName, parser, "pairwise-file");
+   options.pairwise_filename = "";
+   parser.add_option(options.pairwise_filename, 'p', "pairwise-file",
+        "Path to the file containing your sequence data which you will perform pairwise comparison on");
+
+   //addOption(parser, ArgParseOption("i", "interleaved-file",
+   //                                 "Path to the file containing your sequence \
+   //                                 data which is interleaved.",
+   //                                 ArgParseArgument::INPUT_FILE, "IN"));
+   //getOptionValue(options.interleavedFileName, parser, "interleaved-file");
+   options.interleaved_filename = "";
+   parser.add_option(options.interleaved_filename, 'i', "interleaved-file",
+        "Path to the file containing your sequence data which is interleaved");
+
+   //setDefaultValue(parser, "markov-order", "0");
+   //addOption(parser, ArgParseOption("m", "markov-order", "Markov Order",
+   //          ArgParseArgument::INTEGER, "INT"));
+   //getOptionValue(options.markovOrder, parser, "markov-order");
+   options.markov_order = 0;
+   parser.add_option(options.markov_order, 'm', "markov-order", "Markov Order");
+
+   //addOption(parser, ArgParseOption("o", "output-file", "Output file.",
+   //          ArgParseArgument::OUTPUT_FILE, "OUT"));
+   //getOptionValue(options.outputFileName, parser, "output-file");
+   options.output_filename = "";
+   parser.add_option(options.output_filename, 'o', "output-file", "Output file");
+
+   //addOption(parser, ArgParseOption("n", "num-hits",
+   //          "Number of top hits to return when running a Ref/Query search.\
+   //           If you want all the result, enter 0.", ArgParseArgument::INTEGER, "INT"));
+   //setDefaultValue(parser, "num-hits", "10");
+   //getOptionValue(options.nohits, parser, "num-hits");
+   options.nohits = 10;
+   parser.add_option(options.nohits, 'n', "num-hits",
+        "Number of top hits to return when running a Ref/Query search. If you want all the results, enter 0");
+
+   //addOption(parser, ArgParseOption("t", "distance-type",
+   //                                 "The method of calculating the distance \
+   //                                 between two sequences. For descriptions of \
+   //                                 distance please refer to the wiki. ",
+   //                                 ArgParseArgument::STRING, "STR"));
+   //setValidValues(parser, "distance-type",
+   //setDefaultValue(parser, "distance-type", "d2");
+   //getOptionValue(options.type, parser, "distance-type");
+   seqan3::value_list_validator<std::string> type_values {
+        "d2", "euclid", "d2s", "d2star", "manhattan", "chebyshev",
+        "dai", "bc", "ngd", "all", "canberra", "normalised_canberra", "cosine"
+   };
+   options.type = "d2";
+   parser.add_option(options.type, 't', "distance-type",
+        "The method of calculating the distance between two sequences. "
+        "For descriptions of distance please refer to the wiki", seqan3::option_spec::standard, type_values);
+
+   //addOption(parser, ArgParseOption("sc", "score-cutoff", "Score Cutoff for search mode.",
+   //          ArgParseArgument::DOUBLE, "DOUBLE"));
+   //if(isSet(parser, "score-cutoff") == false)
+   //{
+   //   options.score_cutoff = std::numeric_limits<double>::quiet_NaN();
+   //}
+   //getOptionValue(options.score_cutoff, parser, "score-cutoff");
+   options.score_cutoff = std::numeric_limits<double>::quiet_NaN();
+   parser.add_option(options.score_cutoff, 'S', "score-cutoff", "Score Cutoff for search mode");
+
+   //addOption(parser, ArgParseOption("s", "sequence-type",
+   //          "Define the type of sequence data to work with.",
+   //          ArgParseArgument::STRING, "STR"));
+   //setValidValues(parser, "sequence-type", "dna aa raa");
+   //setDefaultValue(parser, "sequence-type", "dna");
+   //getOptionValue(options.sequenceType, parser, "sequence-type");
+   seqan3::value_list_validator<std::string> sequence_type_values { "dna", "aa", "raa" };
+   options.sequence_type = "dna";
+   parser.add_option(options.sequence_type, 's', "sequence-type",
+        "The type of sequence data to work with", seqan3::option_spec::standard, sequence_type_values);
+
+
+   //addOption(parser, ArgParseOption("f", "output-format",
+   //          "For Reference/query based usage you can select your output type.",
+   //          ArgParseArgument::STRING, "STR"));
+   //getOptionValue(options.output_format, parser, "output-format");
+   //setValidValues(parser, "output-format", "default tabular blastlike");
+   //setDefaultValue(parser, "output-format", "default");
+   seqan3::value_list_validator<std::string> output_format_values { "default", "tabular", "blastlike" };
+   options.output_format = "default";
+   parser.add_option(options.output_format, 'f', "output-format",
+        "The output type for Reference/query based usage", seqan3::option_spec::standard, output_format_values);
+
+   //addOption(parser, ArgParseOption("nr", "no-reverse",
+   //          "Do not use reverse compliment."));
+   //options.noreverse = isSet(parser, "no-reverse");
+   options.noreverse = false;
+   parser.add_flag(options.noreverse, 'N', "no-reverse",
+        "Do not use reverse compliment");
+
+   //addOption(parser, ArgParseOption("gc", "calc-gc",
+   //          "Calculate GC content of query/ref in search mode."));
+   //options.calcgc = isSet(parser, "calc-gc");
+   options.calcgc = false;
+   parser.add_flag(options.calcgc, 'G', "calc-gc",
+        "Calculate GC content of query/ref in search mode");
+
+   //addOption(parser, ArgParseOption("nh", "no-header",
+   //          "Do not print header when performing search mode."));
+   //options.noheader = isSet(parser, "no-header");
+   options.noheader = false;
+   parser.add_flag(options.noheader, 'H', "no-header",
+        "Do not print header when performing search mode");
+
+   //addOption(parser, ArgParseOption("mask", "skip-mer",
+   //          "Specify binary masks where a zero indicates \
+   //          skipping that base and one keeps it. e.g. 01110.",
+   //          ArgParseArgument::STRING, "TEXT", true));
+   //for(int i = 0; i < getOptionValueCount(parser, "skip-mer"); i++)
+   //{
+   //   CharString tmpVal;
+   //   getOptionValue(tmpVal, parser, "skip-mer", i);
+   //   options.mask.push_back(tmpVal);
+   //}
+   parser.add_option(options.mask, 'M', "skip-mer",
+        "Specify binary masks where a zero indicates skipping that base and one keeps it, e.g. 01110");
+
+   //addOption(parser, ArgParseOption("c", "num-cores", "Number of Cores.",
+   //          ArgParseArgument::INTEGER, "INT"));
+   //setDefaultValue(parser, "num-cores", "1");
+   //getOptionValue(options.num_threads, parser, "num-cores");
+   options.num_threads = 1;
+   parser.add_option(options.num_threads, 'c', "num-cores", "Number of cores");
+
+   //addOption(parser, ArgParseOption("fp", "filter-percent", "In search mode, only match\
+   //                                 those results where the query and ref sequence \
+   //                                 lengths are within +/- percentage of oneanother.",
+   //          ArgParseArgument::DOUBLE, "DOUBLE"));
+   //getOptionValue(options.filter_percent, parser, "filter-percent");
+   parser.add_option(options.filter_percent, '%', "filter-percent",
+        "In search mode, only match those results where the query and ref sequence lengths are within +/- percentage of one another");
+
+   //addOption(parser, ArgParseOption("fb", "filter-bp", "In search mode, only match\
+   //                                 those results where the query and ref sequence \
+   //                                 lengths are within +/- bp of oneanother.",
+   //          ArgParseArgument::INT64, "INT64"));
+   //getOptionValue(options.filter_bp, parser, "filter-bp");
+   parser.add_option(options.filter_bp, 'B', "filter-bp",
+        "In search mode, only match those results where the query and ref sequence lengths are within +/- bp of one another");
+
+   parser.parse();
+
+   /*
+   Check to see if markov order is correct.
+   */
+   if (options.type == "d2s" || options.type == "d2star" ||
+       options.type == "dai" || options.type == "hao" ||
+       options.type == "all")
    {
-      options.score_cutoff = std::numeric_limits<double>::quiet_NaN();
-   }
-   addOption(parser, ArgParseOption("s", "sequence-type",
-             "Define the type of sequence data to work with.",
-             ArgParseArgument::STRING, "STR"));
-   setValidValues(parser, "sequence-type", "dna aa raa");
-   setDefaultValue(parser, "sequence-type", "dna");
-   addOption(parser, ArgParseOption("f", "output-format",
-             "For Reference/query based usage you can select your output type.",
-             ArgParseArgument::STRING, "STR"));
-   setValidValues(parser, "output-format", "default tabular blastlike");
-   setDefaultValue(parser, "output-format", "default");
-   addOption(parser, ArgParseOption("nr", "no-reverse",
-             "Do not use reverse compliment."));
-   addOption(parser, ArgParseOption("gc", "calc-gc",
-             "Calculate GC content of query/ref in search mode."));
-   addOption(parser, ArgParseOption("nh", "no-header",
-             "Do not print header when performing search mode."));
-   addOption(parser, ArgParseOption("mask", "skip-mer",
-             "Specify binary masks where a zero indicates \
-             skipping that base and one keeps it. e.g. 01110.",
-             ArgParseArgument::STRING, "TEXT", true));
-   addOption(parser, ArgParseOption("c", "num-cores", "Number of Cores.",
-             ArgParseArgument::INTEGER, "INT"));
-/*   addOption(parser, ArgParseOption("l", "low-ram", 
-             "Does not store the reference in RAM. \
-              As long as you're not using a very \
-              large kmer size, this option will \
-              allow you to run kast with a large \
-              reference, however it will take much \
-              longer."));*/
-   setDefaultValue(parser, "num-cores", "1");
-   addOption(parser, ArgParseOption("fp", "filter-percent", "In search mode, only match\
-                                    those results where the query and ref sequence \
-                                    lengths are within +/- percentage of oneanother.",
-             ArgParseArgument::DOUBLE, "DOUBLE"));
-   addOption(parser, ArgParseOption("fb", "filter-bp", "In search mode, only match\
-                                    those results where the query and ref sequence \
-                                    lengths are within +/- bp of oneanother.",
-             ArgParseArgument::INT64, "INT64"));
-   setShortDescription(parser, "Kmer Alignment-free Search Tool.");
-   setVersion(parser, "1.0.2");
-   setDate(parser, "July 2024");
-   addUsageLine(parser, "-q query.fasta -r reference.fasta -o results.txt [\\fIOPTIONS\\fP] ");
-   addUsageLine(parser, "-p mydata.fasta -o results.txt [\\fIOPTIONS\\fP] ");
-   addDescription(parser, "Perform Alignment-free k-tuple frequency \
-                           comparisons from sequences. This can be in \
-                           the form of two input files (e.g. a \
-                           reference and a query) or a single file for \
-                           pairwise comparisons to be made.");
-   ArgumentParser::ParseResult res = parse(parser, argc, argv);
-
-   // Only extract options if the program will continue after parseCommandLine
-   if (res != seqan2::ArgumentParser::PARSE_OK)
-      return res;
-
-   //begin extracting options
-   getOptionValue(options.klen, parser, "klen");
-   getOptionValue(options.score_cutoff, parser, "score-cutoff");
-   getOptionValue(options.nohits, parser, "num-hits");
-   getOptionValue(options.markovOrder, parser, "markov-order");
-   getOptionValue(options.type, parser, "distance-type");
-   getOptionValue(options.sequenceType, parser, "sequence-type");
-   options.noreverse = isSet(parser, "no-reverse");
-   options.calcgc = isSet(parser, "calc-gc");
-   options.noheader = isSet(parser, "no-header");
-   options.debug = isSet(parser, "debug");
-   //options.lowram = isSet(parser, "low-ram");
-   getOptionValue(options.filter_percent, parser, "filter-percent");
-   getOptionValue(options.filter_bp, parser, "filter-bp");
-   getOptionValue(options.queryFileName, parser, "query-file");
-   getOptionValue(options.referenceFileName, parser, "reference-file");
-   getOptionValue(options.pairwiseFileName, parser, "pairwise-file");
-   getOptionValue(options.interleavedFileName, parser, "interleaved-file");
-   getOptionValue(options.outputFileName, parser, "output-file");
-   getOptionValue(options.num_threads, parser, "num-cores");
-   getOptionValue(options.output_format, parser, "output-format");
-
-   for(int i = 0; i < getOptionValueCount(parser, "skip-mer"); i++)
-   {
-      CharString tmpVal;
-      getOptionValue(tmpVal, parser, "skip-mer", i);
-      options.mask.push_back(tmpVal);
-   }
-
-/*
-   Check to see if markov order is correct. 
-*/
-   if(options.type == "d2s" || options.type == "d2star" || 
-      options.type == "dai" || options.type == "hao" || 
-      options.type == "all")
-   {
-      if(options.markovOrder < 0)
-      {
-         cerr << "Markov order must be >= 0 " << endl;
-         return ArgumentParser::PARSE_ERROR;
+      if (options.markov_order < 0) {
+         seqan3::debug_stream << "Markov order must be >= 0 " << std::endl;
+         return false;
       }
 
-      if(options.mask.size() > 0)
-      {
-         if(options.markovOrder >= options.effectiveLength-1)
-         {
-            cerr << "Markov order must be < effectiveLength-1 " << endl;
-            return ArgumentParser::PARSE_ERROR;
+      if (options.mask.size() > 0) {
+         if (options.markov_order >= options.effective_length - 1) {
+            seqan3::debug_stream << "Markov order must be < effectiveLength-1 " << std::endl;
+            return false;
+         }
+      } else {
+         if (options.markov_order >= options.klen - 1) {
+            seqan3::debug_stream << "Markov order must be < klen-1 " << std::endl;
+            return false;
          }
       }
-      else
+   }
+
+   if (parser.is_option_set("pairwise-file")) {
+      if (parser.is_option_set("reference-file") ||
+          parser.is_option_set("query-file"))
       {
-         if(options.markovOrder >= options.klen-1)
-         {
-            cerr << "Markov order must be < klen-1 " << endl;
-            return ArgumentParser::PARSE_ERROR;
-         }
+         seqan3::debug_stream << "If you are performing a pairwise comparison, "
+                                 "you do not need to specify a query (-q) and a "
+                                 "reference (-r) file. If you are performing a "
+                                 "reference/query based search you do not need to "
+                                 "specify a pairwise-file (-p). See kast -h for "
+                                 "details." << std::endl;
+         return false;
       }
    }
 
-   if(isSet(parser, "pairwise-file"))
-   {
-      if(isSet(parser, "reference-file") == true ||
-         isSet(parser, "query-file") == true)
-      {
-         cerr << "If you are performing a pairwise comparison, ";
-         cerr << "you do not need to specify a query (-q) and a ";
-         cerr << "reference (-r) file. If you are performing a ";
-         cerr << "reference/query based search you do not need to ";
-         cerr << "specify a pairwise-file (-p). See kast -h for ";
-         cerr << "details." << endl;
-         return ArgumentParser::PARSE_ERROR;
-      }
+   if (parser.is_option_set("reference-file") == true && !parser.is_option_set("query-file")) {
+      seqan3::debug_stream << "You have specified a reference (-r) file but "
+                              "not a query (-q) file. See kast -h for details." << std::endl;
+      //printHelp(parser);
+      return false;
    }
 
-   if(isSet(parser, "reference-file") == true &&
-      isSet(parser, "query-file") == false)
-   {
-      cerr << "You have specified a reference (-r) file but ";
-      cerr << "not a query (-q) file. See kast -h for details." << endl;
-      printHelp(parser);
-      return ArgumentParser::PARSE_ERROR;
+   if (!parser.is_option_set("reference-file") && parser.is_option_set("query-file")) {
+      seqan3::debug_stream << "You have specified a query (-q) file but "
+                              "not a reference (-r) file. See kast -h for details." << std::endl;
+      //printHelp(parser);
+      return false;
    }
 
-   if(isSet(parser, "reference-file") == false &&
-      isSet(parser, "query-file") == true)
+   if (!parser.is_option_set("reference-file") &&
+       !parser.is_option_set("query-file") &&
+       !parser.is_option_set("pairwise-file") &&
+       !parser.is_option_set("interleaved-file"))
    {
-      cerr << "You have specified a query (-q) file but ";
-      cerr << "not a reference (-r) file. See kast -h for details." << endl;
-      printHelp(parser);
-      return ArgumentParser::PARSE_ERROR;
+      seqan3::debug_stream << "You have not specifed any input file. "
+                              "See kast -h for details." << std::endl;
+      //printHelp(parser);
+      return false;
    }
 
-   if(isSet(parser, "reference-file") == false &&
-      isSet(parser, "query-file") == false &&
-      isSet(parser, "pairwise-file") == false &&
-      isSet(parser, "interleaved-file") == false)
-   {
-      cerr << "You have not specifed any input file. ";
-      cerr << "See kast -h for details." << endl;
-      printHelp(parser);
-      return ArgumentParser::PARSE_ERROR;
-   }
-   return ArgumentParser::PARSE_OK;
+   return true;
 }
 
 /*
-I need to check that if we are using skip-mers, then we need to check that 
-these are sensible.
+I need to check that if we are using skip-mers, then we need to check that these are sensible.
   * skip-mer mask must all be 0/1's
   * skip-mer mask should be the same number of characters as the kmer size
   * all skipmers shoud have the same number of 1's across masks
 */
-int parseMask(ModifyStringOptions options, int &effectiveKlen)
-{
+bool parse_mask(modify_string_options const &options, int &effective_klen) {
    bool first = true;
 
-   //vector<CharString> mask;
-   for(auto m : options.mask)
-   {
+   for (auto m : options.mask) {
       // all should be the same number of characters as the klen
-      if(length(m) != options.klen)
-      {
-         cerr << "ERROR: Mask sizes should be the same size ";
-         cerr << "as the K-Mer length." << endl;
-         return 1;
+      if (m.length() != options.klen) {
+         seqan3::debug_stream << "ERROR: Mask sizes should be the same size "
+                                 "as the K-Mer length." << std::endl;
+         return false;
       }
 
       int counter = 0;
 
       // checks to see that the mask is only made of 0/1's
-      for(int i = 0; i < length(m); i++)
-      {
-         if(m[i] != '0' && m[i] != '1')
-         {
-            cerr << "ERROR: Masks should only contain 0's or 1's." << endl;
-            return 1;
+      for (unsigned i = 0; i < m.length(); ++i) {
+         if (m[i] != '0' && m[i] != '1') {
+            seqan3::debug_stream << "ERROR: Masks should only contain 0's or 1's." << std::endl;
+            return false;
          }
 
-         if(m[i] == '1')
+         if (m[i] == '1') {
             counter++;
+         }
       }
 
-      if(first == true)
-      {
-         effectiveKlen = counter;
+      if (first) {
+         effective_klen = counter;
          first = false;
-      }
-      else
-      {
-         if(counter != effectiveKlen)
-         {
-            cerr << "ERROR: The number of 0's and 1's in each mask ";
-            cerr << "should be the same e.g. 10001, 11000, 00011" << endl;
-            return 1;
+      } else {
+         if (counter != effective_klen) {
+            seqan3::debug_stream << "ERROR: The number of 0's and 1's in each mask "
+                                    "should be the same e.g. 10001, 11000, 00011" << std::endl;
+            return false;
          }
       }
    }
-   return 0;
+   return true;
 };
 
 template <class T>
-int safe_increment(T& value)
-{
-   if(value < numeric_limits<T>::max())
-   {
+int safe_increment(T& value) {
+   if (value < std::numeric_limits<T>::max()) {
       value++;
       return 0;
-   }
-   else
-   {
-      cerr << "Error: Integer overflow detected. Exiting" << endl;
+   } else {
+      seqan3::debug_stream << "Error: Integer overflow detected. Exiting" << std::endl;
       return 1;
    }
 };
 
-template <typename TAlphabet>
-double gc_ratio(String<TAlphabet> sequence)
-{
-   int gc = 0;
-   int agct = 0;
-
-   for(int i = 0; i < length(sequence); i++)
-   {
-      if(sequence[i] == 'G' || sequence[i] == 'C')
-         gc++;
-      if(sequence[i] != 'N')
-         agct++;
+template <seqan3::nucleotide_alphabet T>
+double gc_ratio(std::vector<T> const &sequence) {
+   // this way it should be faster, if speed is ever an issue here
+   std::array<size_t, T::alphabet_size> count;
+   for (auto symbol : sequence) {
+      ++count[symbol.to_rank()];
    }
-   return (double)gc/(double)agct;
+   double gc = count[seqan3::assign_char_to('G', T{}).to_rank()]
+             + count[seqan3::assign_char_to('C', T{}).to_rank()];
+   double at = count[seqan3::assign_char_to('A', T{}).to_rank()]
+             + count[seqan3::assign_char_to('T', T{}).to_rank()];
+   return gc / (gc + at);
 }
 
 /*
 Perform regular counting
 */
-template <typename TAlphabet>
-int countKmersNew(String<unsigned> & kmerCounts, String<TAlphabet> const & sequence, unsigned const k)
-{
-   Shape<TAlphabet> myShape;
-   resize(myShape, k);
-   unsigned long long int kmerNumber = _intPow((unsigned)ValueSize<TAlphabet>::VALUE, weight(myShape));
+template <seqan3::alphabet T>
+void count_kmers(std::vector<unsigned> &kmer_counts, std::vector<T> const &sequence,
+                 unsigned const k) {
+   seqan3::ungapped ungapped_k{ uint8_t(k) };
+   seqan3::shape my_shape{ungapped_k};
 
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
+   uint64_t kmer_number = seqan3::pow(T::alphabet_size, k);
 
-   auto itSequence = begin(sequence);
+   kmer_counts.clear();
+   kmer_counts.resize(kmer_number, 0);
 
-   for (; itSequence <= (end(sequence) - k); ++itSequence)
-   {
-      long long unsigned int hashValue = seqan2::hash(myShape, itSequence);
-      safe_increment(kmerCounts[hashValue]);
+   auto hash_view = sequence | seqan3::views::kmer_hash(my_shape);
+   for (auto hash : hash_view) {
+      safe_increment(kmer_counts[hash]);
    }
-   return 0;
 };
 
+// This is a specialization that treats N of dna5 as a non-value
+// and computes hashes assuming base 4.
+// This is not possible with seqan3 out of the box without writing own code,
+// and the computation is reasonably trivial.
 template <>
-int countKmersNew(String<unsigned> & kmerCounts, String<Dna5> const & sequence, unsigned const k)
-{
-   Shape<Dna> myShape;
-   resize(myShape, k);
-   int kmerNumber = _intPow((unsigned)ValueSize<Dna>::VALUE, weight(myShape));
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
+void count_kmers(std::vector<unsigned> & kmer_counts, std::vector<seqan3::dna5> const &sequence,
+                 unsigned const k) {
+   uint64_t kmer_number = uint64_t(1) << (2 * k);
+   kmer_counts.clear();
+   kmer_counts.resize(kmer_number, 0);
 
-   auto itSequence = begin(sequence);
-   int counterN = 0;
+   uint64_t curr_hash = 0;
+   uint64_t hash_mask = kmer_number - 1;
+   uint32_t banned_mask = (uint32_t(1) << k) - 1;
+   uint32_t banned_bits = 0;
 
-   // Check for any N that destroys the first kmers
-   unsigned j = k - 1;
-   for (auto i = position(itSequence); i <= j; ++i)
-   {
-       if (_repeatMaskValue(sequence[i]))
-       {
-           counterN = i + 1;
-       }
+   for (size_t i = 0; i + 1 < k; ++i) {
+      curr_hash <<= 2;
+      banned_bits = (banned_bits << 1) & banned_mask;
+      char base = sequence[i].to_char();
+      if (base == 'N') {
+         banned_bits |= 1;
+      } else {
+         // this makes all indexing compatible to dna4
+         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+      }
    }
 
-   for (; itSequence <= (end(sequence) - k); ++itSequence)
-   {
-       // Check if there is a "N" at the end of the new kmer
-       if (_repeatMaskValue(value(itSequence + (k - 1))))
-           counterN = k;  // Do not consider any kmer covering this "N"
-       // If there is no "N" overlapping with the current kmer, count it
-       if (counterN <= 0)
-       {
-           unsigned hashValue = seqan2::hash(myShape, itSequence);
-           safe_increment(kmerCounts[hashValue]);
-       }
-       counterN--;
+   for (size_t i = k - 1; i < sequence.size(); ++i) {
+      curr_hash = (curr_hash << 2) & hash_mask;
+      banned_bits = (banned_bits << 1) & banned_mask;
+      char base = sequence[i].to_char();
+      if (base == 'N') {
+         banned_bits |= 1;
+      } else {
+         // this makes all indexing compatible to dna4
+         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+      }
+      if (!banned_bits) safe_increment(kmer_counts[curr_hash]);
    }
-
-   return 0;
 };
 
 
@@ -372,198 +412,182 @@ int countKmersNew(String<unsigned> & kmerCounts, String<Dna5> const & sequence, 
 Perform counting with a mask array
 For AminoAcid and ReducedAminoAcid
 */
-template <typename TAlphabet>
-int countKmersNew(String<unsigned> & kmerCounts, String<TAlphabet> const & sequence, 
-                  unsigned const k, unsigned const effectiveK,
-                  vector<CharString> const & mask)
-{
-   /*Build the shape to traverse the sequence (this is the full kmer size)*/
-   Shape<TAlphabet> myShape;
-   resize(myShape, k);
+template <seqan3::alphabet T>
+void count_kmers(std::vector<unsigned> &kmer_counts,
+                 std::vector<T> const &sequence,
+                 unsigned const k,
+                 unsigned const effective_k,
+                 std::vector<std::string> const &masks) {
+   uint64_t kmer_number = seqan3::pow(T::alphabet_size, effective_k);
+   kmer_counts.clear();
+   kmer_counts.resize(kmer_number, 0);
 
-   auto itSequence = begin(sequence);
-   int counterN = 0;
-
-   // Now create the effective size shape
-   Shape<TAlphabet> maskShape;
-   resize(maskShape, effectiveK);
-
-   // resize the kmerCounts vector for this entry which 
-   int kmerNumber = _intPow((unsigned)ValueSize<TAlphabet>::VALUE, weight(maskShape));
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
-
-   // go through the sequence using k=X at a time
-   for (; itSequence <= (end(sequence) - k); ++itSequence)
-   {
-      unsigned hashValue = seqan2::hash(myShape, itSequence);
-      String<TAlphabet> orig;
-      unhash(orig, hashValue, k);
-
-      //cout << orig << endl;
-
-      // here, I need to loop
-      for(int i = 0; i < mask.size(); i++)
-      {
-         String<TAlphabet> dnaSeq;
-         for(int m = 0; m < length(mask[i]); m++)
-         {
-            if(mask[i][m] == '1')
-            {
-               dnaSeq += orig[m];
-            }
-         }
-         //cout << dnaSeq << endl;
-         auto it = begin(dnaSeq);
-         unsigned hashMask = seqan2::hash(maskShape, it);
-         safe_increment(kmerCounts[hashMask]);
+   for (std::string const &mask : masks) {
+      seqan3::bin_literal bin;
+      for (size_t i = 0; i < mask.length(); ++i) {
+         if (mask[i] == '1') bin.value |= size_t(1) << i;
+      }
+      auto hash_view = sequence | seqan3::views::kmer_hash(seqan3::shape(bin));
+      for (auto hash : hash_view) {
+         safe_increment(kmer_counts[hash]);
       }
    }
-   return 0;
 };
 
 // For Dna
 template <>
-int countKmersNew(String<unsigned> & kmerCounts, String<Dna5> const & sequence,
-                  unsigned const k, unsigned const effectiveK,
-                  vector<CharString> const & mask)
-{
-   /*Build the shape to traverse the sequence (this is the full kmer size)*/
-   Shape<Dna> myShape;
-   resize(myShape, k);
+void count_kmers(std::vector<unsigned> &kmer_counts,
+                 std::vector<seqan3::dna5> const& sequence,
+                 unsigned const k,
+                 unsigned const effective_k,
+                 std::vector<std::string> const &masks) {
+   uint64_t kmer_number = uint64_t(1) << (2 * effective_k);
+   kmer_counts.clear();
+   kmer_counts.resize(kmer_number, 0);
 
-   auto itSequence = begin(sequence);
-   int counterN = 0;
+   uint64_t curr_hash = 0;
+   uint64_t hash_mask = (uint64_t(1) << (2 * k)) - 1;
+   uint32_t banned_mask = (uint32_t(1) << k) - 1;
+   uint32_t banned_bits = 0;
 
-   // Now create the effective size shape
-   Shape<Dna> maskShape;
-   resize(maskShape, effectiveK);
-
-   int kmerNumber = _intPow((unsigned)ValueSize<Dna>::VALUE, weight(maskShape));
-   seqan2::clear(kmerCounts);
-   seqan2::resize(kmerCounts, kmerNumber, 0);
-
-   // Check for any N that destroys the first kmers
-   unsigned j = k - 1;
-   for (auto i = position(itSequence); i <= j; ++i)
-   {
-       if (_repeatMaskValue(sequence[i]))
-       {
-           counterN = i + 1;
-       }
+   std::vector<uint32_t> parsed_masks;
+   for (std::string const &mask : masks) {
+      uint32_t bin = 0;
+      for (size_t i = 0; i < mask.length(); ++i) {
+         if (mask[i] == '1') bin |= 1 << i;
+      }
+      parsed_masks.push_back(bin);
    }
 
-   for (; itSequence <= (end(sequence) - k); ++itSequence)
-   {
-       // Check if there is a "N" at the end of the new kmer
-       if (_repeatMaskValue(value(itSequence + (k - 1))))
-           counterN = k;  // Do not consider any kmer covering this "N"
-
-       // If there is no "N" overlapping with the current kmer, count it
-       if (counterN <= 0)
-       {
-           unsigned hashValue = seqan2::hash(myShape, itSequence);
-           DnaString orig;
-           unhash(orig, hashValue, k);
-
-           // here, I need to loop
-           for(int i = 0; i < mask.size(); i++)
-           {
-              String<Dna> dnaSeq;
-              for(int m = 0; m < length(mask[i]); m++)
-              {
-                 if(mask[i][m] == '1')
-                 {
-                    dnaSeq += orig[m];
-                 }
-              }
-
-              auto it = begin(dnaSeq);
-              unsigned hashMask = seqan2::hash(maskShape, it);
-              safe_increment(kmerCounts[hashMask]);
-           }
-       }
-       counterN--;
+   for (size_t i = 0; i + 1 < k; ++i) {
+      curr_hash <<= 2;
+      banned_bits = (banned_bits << 1) & banned_mask;
+      char base = sequence[i].to_char();
+      if (base == 'N') {
+         banned_bits |= 1;
+      } else {
+         // this makes all indexing compatible to dna4
+         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+      }
    }
-   return 0;
-};
+
+   // Note that here we only count those masked k-mers where:
+   //  - the entire k bits, masked or not, are contained in the sequence (e.g. if the mask is 11110100,
+   //       we do not count in the k-mer resulting in last 111101 masked bits of the sequence)
+   //  - the entire k bits should be N-free, even if all Ns are masked away.
+   //
+   // Whether this is sound from the bioinf perspective, I don't know,
+   // so backward compatibility is preserved just in case.
+   for (size_t i = k - 1; i < sequence.size(); ++i) {
+      curr_hash = (curr_hash << 2) & hash_mask;
+      banned_bits = (banned_bits << 1) & banned_mask;
+      char base = sequence[i].to_char();
+      if (base == 'N') {
+         banned_bits |= 1;
+      } else {
+         // this makes all indexing compatible to dna4
+         curr_hash += seqan3::assign_char_to(base, seqan3::dna4{}).to_rank();
+      }
+      if (!banned_bits) {
+         for (uint32_t mask : parsed_masks) {
+            uint64_t copy_hash = curr_hash;
+            uint64_t result = 0;
+            while (mask) {
+               if (mask & 1) {
+                  result <<= 2;
+                  result |= copy_hash & 3;
+               }
+               mask >>= 1;
+               copy_hash >>= 2;
+            }
+            safe_increment(kmer_counts[copy_hash]);
+         }
+      }
+   }
+}
 
 // for all others
-template <typename TAlphabet>
-void markov(String<double> & markovCounts, String<unsigned> const & kmerCounts,
-            String<TAlphabet> const & sequence, unsigned const k, unsigned const markovOrder)
-{
-   // setup markovCounts
-   Shape<TAlphabet> myShape;
-   resize(myShape, k);
-   int kmerNumber = _intPow((unsigned)ValueSize<TAlphabet>::VALUE, weight(myShape));
+template <seqan3::writable_alphabet T>
+void markov(std::vector<double> &markov_counts,
+            std::vector<T> const &sequence,
+            unsigned const k,
+            unsigned const markov_order) {
+   // init the result vector
+   uint64_t kmer_number = seqan3::pow(T::alphabet_size, k);
+   markov_counts.clear();
+   markov_counts.resize(kmer_number, 0);
 
-   seqan2::clear(markovCounts);
-   seqan2::resize(markovCounts, kmerNumber, 0);
+   // create the background model
+   std::vector<unsigned> markov_bg;
+   count_kmers(markov_bg, sequence, markov_order + 1);
+   unsigned total_count = std::reduce(markov_bg.begin(), markov_bg.end());
 
-   // Now create the background model
-   String<unsigned> markovbg;
-   countKmersNew(markovbg, sequence, markovOrder+1);
-   unsigned tot = 0;
+   // seqan3 does not have anything for unhash, so we simulate it
+   std::vector<unsigned> markov_query;
+   std::vector<T> kmer(k);
 
-   // sum the occurances
-   for(unsigned i = 0; i < length(markovbg); i++)
-      tot = tot + markovbg[i];
-
-   for(unsigned i = 0; i < length(markovCounts); i++)
-   {
-      String<TAlphabet> inf;
-      unhash(inf, i, k);
-      String<unsigned> occurances;
-      countKmersNew(occurances, inf, markovOrder+1);
-      double prob = 1.0;
-      for(unsigned i = 0; i < length(occurances); i++)
-      {
-         prob = prob * pow(((double)markovbg[i]/(double)tot), occurances[i]);
+   for (uint64_t kmer_idx = 0; kmer_idx < kmer_number; ++kmer_idx) {
+      count_kmers(markov_query, kmer, markov_order + 1);
+      double prob = 1;
+      for (size_t i = 0; i < markov_query.size(); ++i) {
+         prob *= std::pow((double) (markov_bg[i]) / total_count, markov_query[i]); //seqan3::pow?
       }
-      markovCounts[i] = prob;
+      markov_counts[kmer_idx] = prob;
+
+      // this is the "+1" operation on the kmer
+      for (size_t i = 0; i < k; ++i) {
+         unsigned rank = seqan3::to_rank(kmer[i]);
+         if (rank + 1 < T::alphabet_size) {
+            kmer[i].assign_rank(rank + 1);
+            break;
+         } else {
+            kmer[i].assign_rank(0);
+         }
+      }
    }
-};
+}
 
 // for DNA sequences
 template <>
-void markov<>(String<double> & markovCounts, String<unsigned> const & kmerCounts,
-              String<Dna5> const & sequence, unsigned const k, unsigned const markovOrder)
-{
-   // setup markovCounts
-   Shape<Dna> myShape;
-   resize(myShape, k);
-   int kmerNumber = _intPow((unsigned)ValueSize<Dna>::VALUE, weight(myShape));
-   seqan2::clear(markovCounts);
-   seqan2::resize(markovCounts, kmerNumber, 0);
+void markov<>(std::vector<double> &markov_counts,
+              std::vector<seqan3::dna5> const &sequence,
+              unsigned const k,
+              unsigned const markov_order) {
+   // init the result vector
+   uint64_t kmer_number = uint64_t(1) << (2 * k);
+   markov_counts.clear();
+   markov_counts.resize(kmer_number, 0);
 
-   // Now create the background model
-   String<unsigned> markovbg;
-   countKmersNew(markovbg, sequence, markovOrder+1);
-   unsigned long long int tot = 0;
+   // create the background model
+   std::vector<unsigned> markov_bg;
+   count_kmers(markov_bg, sequence, markov_order + 1);
+   unsigned total_count = std::reduce(markov_bg.begin(), markov_bg.end());
 
-   // sum the occurances
-   for(unsigned i = 0; i < length(markovbg); i++)
-      tot = tot + markovbg[i];
+   // we simulate the unhash and do it for dna4
+   std::vector<unsigned> markov_query;
+   std::vector<seqan3::dna4> kmer(k);
 
-   //cout << "Markov " << endl;
-
-   for(unsigned i = 0; i < length(markovCounts); i++)
-   {
-      String<Dna> inf;
-      unhash(inf, i, k);
-      String<Dna5> meh = inf; // this conversion is important, as countKmers requires Dna5
-      String<unsigned> occurances;
-      countKmersNew(occurances, meh, markovOrder+1);
-      double prob = 1.0;
-      for(unsigned i = 0; i < length(occurances); i++)
-      {
-         prob = prob * pow(((double)markovbg[i]/(double)tot), occurances[i]);
+   for (uint64_t kmer_idx = 0; kmer_idx < kmer_number; ++kmer_idx) {
+      // this calls the dna4 version (the generic one), which will do it just right
+      count_kmers(markov_query, kmer, markov_order + 1);
+      double prob = 1;
+      for (size_t i = 0; i < markov_query.size(); ++i) {
+         prob *= std::pow((double) (markov_bg[i]) / total_count, markov_query[i]); //seqan3::pow?
       }
-      markovCounts[i] = prob;
-      //cout << inf << "\t" << prob << "\t" << endl;
+      markov_counts[kmer_idx] = prob;
+
+      // this is the "+1" operation on the kmer
+      for (size_t i = 0; i < k; ++i) {
+         unsigned rank = seqan3::to_rank(kmer[i]);
+         if (rank < 3) {
+            kmer[i].assign_rank(rank + 1);
+            break;
+         } else {
+            kmer[i].assign_rank(0);
+         }
+      }
    }
-};
+}
 
 /// Experimental idea
 
@@ -581,6 +605,8 @@ I think the best way to do this is to put the kmers in alphabetical order. So in
 example above, CMY could be the correct order, and CYM and the others will all be reordered to CMY.
 
 */
+
+/*
 template <typename TAlphabet>
 int countReducedAlphabet(String<unsigned> & kmerCounts, String<TAlphabet> const & sequence, unsigned const k)
 {
@@ -595,10 +621,10 @@ int countReducedAlphabet(String<unsigned> & kmerCounts, String<TAlphabet> const 
 
    for (; itSequence <= (end(sequence) - k); ++itSequence)
    {
-      cout << itSequence << "\t" << value(itSequence) << "\t";
+      std::cout << itSequence << "\t" << value(itSequence) << "\t";
       DnaString meh;
       seqan2::unhash(meh, seqan2::hash(myShape, itSequence), weight(myShape));
-      cout << meh << endl;
+      std::cout << meh << std::endl;
       //cout << seqan::unhash(meh, seqan::hash(myShape, itSequence), itSequence) << endl;
       long long unsigned int hashValue = seqan2::hash(myShape, itSequence);
 
@@ -607,6 +633,6 @@ int countReducedAlphabet(String<unsigned> & kmerCounts, String<TAlphabet> const 
    return 0;
 };
 
-
+*/
 
 #endif

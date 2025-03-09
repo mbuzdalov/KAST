@@ -1,60 +1,53 @@
-#ifndef DIST_H
-#define DIST_H
+#ifndef __KAST_DISTANCE_H__
+#define __KAST_DISTANCE_H__
 
-#include <iostream>
-#include <seqan/sequence.h>
-#include <seqan/stream.h>
-#include <seqan/file.h>
-#include <seqan/arg_parse.h>
-#include <seqan/seq_io.h>
-#include <string>
-#include "common.h"
+#include <vector>
 
-double d2(String<unsigned> const & kmerCounts1,
-          String<unsigned> const & kmerCounts2);
+double d2(std::vector<unsigned> const &kmerCounts1,
+          std::vector<unsigned> const &kmerCounts2);
 
-double cosine(String<unsigned> const & kmerCounts1,
-              String<unsigned> const & kmerCounts2);
+double cosine(std::vector<unsigned> const &kmerCounts1,
+              std::vector<unsigned> const &kmerCounts2);
 
-double euler(String<unsigned> const & kmerCounts1,
-             String<unsigned> const & kmerCounts2);
+double euler(std::vector<unsigned> const &kmerCounts1,
+             std::vector<unsigned> const &kmerCounts2);
 
-double bray_curtis_distance(String<unsigned> const & kmerCounts1,
-                            String<unsigned> const & kmerCounts2);
+double bray_curtis_distance(std::vector<unsigned> const &kmerCounts1,
+                            std::vector<unsigned> const &kmerCounts2);
 
-double normalised_google_distance(String<unsigned> const & kmerCounts1,
-                                  String<unsigned> const & kmerCounts2);
+double normalised_google_distance(std::vector<unsigned> const &kmerCounts1,
+                                  std::vector<unsigned> const &kmerCounts2);
 
-double chebyshev(String<unsigned> const & kmerCounts1,
-                 String<unsigned> const & kmerCounts2);
+double chebyshev(std::vector<unsigned> const &kmerCounts1,
+                 std::vector<unsigned> const &kmerCounts2);
 
-double canberra(String<unsigned> const & kmerCounts1,
-                String<unsigned> const & kmerCounts2);
+double canberra(std::vector<unsigned> const &kmerCounts1,
+                std::vector<unsigned> const &kmerCounts2);
 
-double normalised_canberra(String<unsigned> const & kmerCounts1,
-                           String<unsigned> const & kmerCounts2);
+double normalised_canberra(std::vector<unsigned> const &kmerCounts1,
+                           std::vector<unsigned> const &kmerCounts2);
 
-double manhattan(String<unsigned> const & kmerCounts1,
-                 String<unsigned> const & kmerCounts2);
+double manhattan(std::vector<unsigned> const &kmerCounts1,
+                 std::vector<unsigned> const &kmerCounts2);
 
-double d2s(String<unsigned> const & kmerCounts1,
-           String<unsigned> const & kmerCounts2,
-           String<double> const & markovCounts1,
-           String<double> const & markovCounts2);
+double d2s(std::vector<unsigned> const &kmerCounts1,
+           std::vector<unsigned> const &kmerCounts2,
+           std::vector<double> const &markovCounts1,
+           std::vector<double> const &markovCounts2);
 
-double d2star(String<unsigned> const & kmerCounts1,
-              String<unsigned> const & kmerCounts2,
-              String<double> const & markovCounts1,
-              String<double> const & markovCounts2);
+double d2star(std::vector<unsigned> const &kmerCounts1,
+              std::vector<unsigned> const &kmerCounts2,
+              std::vector<double> const &markovCounts1,
+              std::vector<double> const &markovCounts2);
 
-double dai(String<unsigned> const & kmerCounts1,
-           String<unsigned> const & kmerCounts2,
-           String<double> const & markovCounts1,
-           String<double> const & markovCounts2);
+double dai(std::vector<unsigned> const &kmerCounts1,
+           std::vector<unsigned> const &kmerCounts2,
+           std::vector<double> const &markovCounts1,
+           std::vector<double> const &markovCounts2);
 
-double hao(String<unsigned> const & kmerCounts1,
-           String<unsigned> const & kmerCounts2,
-           String<double> const & markovCounts1,
-           String<double> const & markovCounts2);
+double hao(std::vector<unsigned> const &kmerCounts1,
+           std::vector<unsigned> const &kmerCounts2,
+           std::vector<double> const &markovCounts1,
+           std::vector<double> const &markovCounts2);
 
 #endif

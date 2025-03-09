@@ -1,8 +1,11 @@
 # Minimum cmake version
-cmake_minimum_required (VERSION 3.0.0)
+cmake_minimum_required (VERSION 3.20)
 
 # Name of project and that it is C++ only.
 project (kast CXX)
+
+# We want to be at least C++23 because of seqan
+set(CMAKE_CXX_STANDARD 23)
 
 # ----------------------------------------------------------------------------
 # Dependencies
@@ -17,25 +20,25 @@ find_package (Threads REQUIRED)
 SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 
 # Load the SeqAn module and fail if not found.
-find_package (SeqAn REQUIRED)
+find_package (seqan3 REQUIRED)
 
 # ----------------------------------------------------------------------------
 # Build Setup
 # ----------------------------------------------------------------------------
 
 # Add include directories.
-include_directories (${SEQAN_INCLUDE_DIRS})
+include_directories (${SEQAN3_INCLUDE_DIRS})
 
 # Add definitions set by find_package (SeqAn).
-add_definitions (${SEQAN_DEFINITIONS})
-add_definitions ( -DSEQAN_DISABLE_VERSION_CHECK )
+add_definitions (${SEQAN3_DEFINITIONS})
+add_definitions ( -DSEQAN3_NO_VERSION_CHECK )
 
 # Add CXX flags found by find_package (SeqAn).
-set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS} -Wl,--whole-archive -lrt -pthread -lgomp -Wl,--no-as-needed -ldl")
-#set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS}")
+#set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS} -Wl,--whole-archive -lrt -pthread -lgomp -Wl,--no-as-needed -ldl")
+set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS}")
 
 # Add executable and link against SeqAn dependencies.
 add_executable (kast distance.cpp kast.cpp)
-target_link_libraries (kast ${SEQAN_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (kast ${SEQAN3_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 add_executable (kast_tests distance.cpp kast_tests.cpp)
-target_link_libraries (kast_tests ${SEQAN_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (kast_tests ${SEQAN3_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})

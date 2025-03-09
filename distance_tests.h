@@ -1,494 +1,309 @@
-#include <seqan/basic.h>
+#include <ranges>
+#include <vector>
 #include <iostream>
-#include <seqan/arg_parse.h>
-#include <seqan/seq_io.h>
+
+#include <seqan3/alphabet/all.hpp>
 
 #include "distance.h"
 #include "utils.h"
 
-using namespace seqan2;
-using namespace std;
+using namespace seqan3::literals;
+
+template<typename T, typename R>
+void append_range(std::vector<T> &destination, R const &range) {
+    destination.insert(destination.end(), range.begin(), range.end());
+}
 
 /*
    Prep the query and reference sequences and perform counts
 */
-void prep(String<unsigned> & qrycounts, String<unsigned> & refcounts, unsigned int k)
+void prep(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts, unsigned k)
 {
-   String<Dna5> qryseq = "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG";
-   String<Dna5> refseq = "CGGAGACCTCCGTGGACGGGGAAGTCCTGCGCGGGTCAGACGTACGCCCCGATTAGTTGCCCGGACGCCCGGTTGGCAGAAGTGACGGCGACTGCCCTCA";
+   std::vector<seqan3::dna5> qryseq { "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG"_dna5 };
+   std::vector<seqan3::dna5> refseq { "CGGAGACCTCCGTGGACGGGGAAGTCCTGCGCGGGTCAGACGTACGCCCCGATTAGTTGCCCGGACGCCCGGTTGGCAGAAGTGACGGCGACTGCCCTCA"_dna5 };
 
-   String<Dna5> qryseqrc = qryseq;
-   reverseComplement(qryseqrc);
-   append(qryseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"); // this should probably the same size as options.klen
-   append(qryseq, qryseqrc);
+   // TODO: reverse-complementing onto itself should possibly be doable without copying,
+   // and possibly be contained in utils
+   std::vector<seqan3::dna5> qryseqrc = qryseq;
+   append_range(qryseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
+   append_range(qryseq, qryseqrc | std::views::reverse | seqan3::views::complement);
 
-   String<Dna5> refseqrc = refseq;
-   reverseComplement(refseqrc);
-   append(refseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"); // this should probably the same size as options.klen
-   append(refseq, refseqrc);
+   std::vector<seqan3::dna5> refseqrc = refseq;
+   append_range(refseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
+   append_range(refseq, refseqrc | std::views::reverse | seqan3::views::complement);
 
-   countKmersNew(qrycounts, qryseq, k);
-   countKmersNew(refcounts, refseq, k);
+   count_kmers(qrycounts, qryseq, k);
+   count_kmers(refcounts, refseq, k);
 }
 
-void prep(String<unsigned> & qrycounts, String<unsigned> & refcounts, 
-          String<double> & qrymarkov, String<double> & refmarkov,
-          unsigned int k, unsigned int m)
+void prep(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts,
+          std::vector<double> &qrymarkov, std::vector<double> &refmarkov,
+          unsigned k, unsigned markov_order)
 {
-   String<Dna5> qryseq = "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG";
-   String<Dna5> refseq = "CGGAGACCTCCGTGGACGGGGAAGTCCTGCGCGGGTCAGACGTACGCCCCGATTAGTTGCCCGGACGCCCGGTTGGCAGAAGTGACGGCGACTGCCCTCA";
+   std::vector<seqan3::dna5> qryseq { "AGGCAGCGTACGAACCTACTGGAGTTGCGGTATGGGACCAGGCGACCTCTGATGCAGAGATACAGGAGCGCCGCGCCGGGTCTTCCTTGTAGAAGTCCTG"_dna5 };
+   std::vector<seqan3::dna5> refseq { "CGGAGACCTCCGTGGACGGGGAAGTCCTGCGCGGGTCAGACGTACGCCCCGATTAGTTGCCCGGACGCCCGGTTGGCAGAAGTGACGGCGACTGCCCTCA"_dna5 };
 
-   String<Dna5> qryseqrc = qryseq;
-   reverseComplement(qryseqrc);
-   append(qryseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"); // this should probably the same size as options.klen
-   append(qryseq, qryseqrc);
+   // TODO: reverse-complementing onto itself should possibly be doable without copying
+   // and possibly be contained in utils
+   std::vector<seqan3::dna5> qryseqrc = qryseq;
+   append_range(qryseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
+   append_range(qryseq, qryseqrc | std::views::reverse | seqan3::views::complement);
 
-   String<Dna5> refseqrc = refseq;
-   reverseComplement(refseqrc);
-   append(refseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"); // this should probably the same size as options.klen
-   append(refseq, refseqrc);
+   std::vector<seqan3::dna5> refseqrc = refseq;
+   append_range(refseq, "NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN"_dna5); // this should probably the same size as options.klen
+   append_range(refseq, refseqrc | std::views::reverse | seqan3::views::complement);
 
-   countKmersNew(qrycounts, qryseq, k);
-   countKmersNew(refcounts, refseq, k);
+   count_kmers(qrycounts, qryseq, k);
+   count_kmers(refcounts, refseq, k);
 
-   markov(qrymarkov, qrycounts, qryseq, k, m);
-   markov(refmarkov, refcounts, refseq, k, m);
+   markov(qrymarkov, qryseq, k, markov_order);
+   markov(refmarkov, refseq, k, markov_order);
 }
 
-void prep_aa(String<unsigned> & qrycounts, String<unsigned> & refcounts,
-             unsigned int k)
+void prep_aa(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts,
+             unsigned k)
 {
-   String<AminoAcid> qryseq = "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL";
-   String<AminoAcid> refseq = "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH";
+   std::vector<seqan3::aa20> qryseq { "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL"_aa20 };
+   std::vector<seqan3::aa20> refseq { "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH"_aa20 };
 
-   countKmersNew(qrycounts, qryseq, k);
-   countKmersNew(refcounts, refseq, k);
+   count_kmers(qrycounts, qryseq, k);
+   count_kmers(refcounts, refseq, k);
 }
 
-void prep_aa(String<unsigned> & qrycounts, String<unsigned> & refcounts,
-             String<double> & qrymarkov, String<double> & refmarkov,
-             unsigned int k, unsigned int m)
+void prep_aa(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts,
+             std::vector<double> &qrymarkov, std::vector<double> &refmarkov,
+             unsigned k, unsigned markov_order)
 {
-   String<AminoAcid> qryseq = "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL";
-   String<AminoAcid> refseq = "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH";
+   std::vector<seqan3::aa20> qryseq { "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL"_aa20 };
+   std::vector<seqan3::aa20> refseq { "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH"_aa20 };
 
-   countKmersNew(qrycounts, qryseq, k);
-   countKmersNew(refcounts, refseq, k);
+   count_kmers(qrycounts, qryseq, k);
+   count_kmers(refcounts, refseq, k);
 
-   markov(qrymarkov, qrycounts, qryseq, k, m);
-   markov(refmarkov, refcounts, refseq, k, m);
+   markov(qrymarkov, qryseq, k, markov_order);
+   markov(refmarkov, refseq, k, markov_order);
 }
 
-void prep_raa(String<unsigned> & qrycounts, String<unsigned> & refcounts,
-              unsigned int k)
+void prep_raa(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts,
+              unsigned k)
 {
-   String<ReducedAminoAcidMurphy10> qryseq = "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL";
-   String<ReducedAminoAcidMurphy10> refseq = "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH";
+   std::vector<seqan3::aa10murphy> qryseq { "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL"_aa10murphy };
+   std::vector<seqan3::aa10murphy> refseq { "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH"_aa10murphy };
 
-   countKmersNew(qrycounts, qryseq, k);
-   countKmersNew(refcounts, refseq, k);
+   count_kmers(qrycounts, qryseq, k);
+   count_kmers(refcounts, refseq, k);
 }
 
-void prep_raa(String<unsigned> & qrycounts, String<unsigned> & refcounts,
-              String<double> & qrymarkov, String<double> & refmarkov,
-              unsigned int k, unsigned int m)
+void prep_raa(std::vector<unsigned> &qrycounts, std::vector<unsigned> &refcounts,
+              std::vector<double> &qrymarkov, std::vector<double> &refmarkov,
+              unsigned k, unsigned markov_order)
 {
-   String<ReducedAminoAcidMurphy10> qryseq = "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL";
-   String<ReducedAminoAcidMurphy10> refseq = "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH";
+   std::vector<seqan3::aa10murphy> qryseq { "MTEITAAMVKELRESTGAGMMDCKNALSETNGDFDKAVQLLREKGLGKAAKKADRLAAEGLVSVKVSDDFTIAAMRPSYLSYEDLDMTFVENEYKALVAELEKENEERRRLKDPNKPEHKIPQFASRKQLSDAILKEAEEKIKEELKAQGKPEKIWDNIIPGKMNSFIADNSQLDSKLTLMGQFYVMDDKKTVEQVIAEKEKEFGGKIKIVEFICFEVGEGLEKKTEDFAAEVAAQL"_aa10murphy };
+   std::vector<seqan3::aa10murphy> refseq { "SATVSEINSETDFVAKNDQFIALTKDTTAHIQSNSLQSVEELHSSTINGVKFEEYLKSQIATIGENLVVRRFATLKAGANGVVNGYIHTNGRVGVVIAAACDSAEVASKSRDLLRQICMH"_aa10murphy };
 
-   countKmersNew(qrycounts, qryseq, k);
-   countKmersNew(refcounts, refseq, k);
+   count_kmers(qrycounts, qryseq, k);
+   count_kmers(refcounts, refseq, k);
 
-   markov(qrymarkov, qrycounts, qryseq, k, m);
-   markov(refmarkov, refcounts, refseq, k, m);
+   markov(qrymarkov, qryseq, k, markov_order);
+   markov(refmarkov, refseq, k, markov_order);
 }
 
-/*
-   Begin running tests
-*/
-SEQAN_DEFINE_TEST(d2_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.10619));
-   expected_results.push_back(make_pair(5, 0.3537));
-   expected_results.push_back(make_pair(7, 0.47872));
-   expected_results.push_back(make_pair(9, 0.49457));
+/////////////////////////////////////////////////////////
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(d2(refcounts, qrycounts), result.second, 0.0001);
-   }
+#define FAIL_IF_NOT_WITHIN(found, expected, eps) { \
+    double found_val = found; \
+    if (found_val < expected - eps || found_val > expected + eps) { \
+        seqan3::debug_stream << "Test " << __func__ << "/" << #found << " failed: expected " << expected << " found " << found_val << std::endl; \
+        /*exit(1);*/ \
+    } else { \
+        seqan3::debug_stream << "Test " << __func__ << "/" << #found << " OK" << std::endl; \
+    } \
 }
 
-SEQAN_DEFINE_TEST(d2_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.47198));
-   expected_results.push_back(make_pair(5, 0.5));
-   expected_results.push_back(make_pair(6, 0.5));
+void tests_prep_dna_3() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep(qrycounts, refcounts, qrymarkov, refmarkov, 3, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_aa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(d2(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.10619, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.10306, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 0.63265, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.316326530612, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.316326530612, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.03061, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.43246389442301436, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.4027100011247771, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(d2_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.301479));
-   expected_results.push_back(make_pair(4, 0.445397));
-   expected_results.push_back(make_pair(5, 0.484987));
-   expected_results.push_back(make_pair(6, 0.5));
+void tests_prep_dna_5() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep(qrycounts, refcounts, qrymarkov, refmarkov, 5, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_raa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(d2(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.3537, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.09317, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 1.45833, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.729166666667, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.729166666667, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.01042, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.3808187760303444, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.4333069320392635, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(euler_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.10306));
-   expected_results.push_back(make_pair(5, 0.09317));
-   expected_results.push_back(make_pair(7, 0.10092));
-   expected_results.push_back(make_pair(9, 0.10369));
+void tests_prep_dna_7() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep(qrycounts, refcounts, qrymarkov, refmarkov, 7, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(euler(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.47872, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.10092, 0.0001);
+    //FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), ???, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.957446808511, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.957446808511, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.00532, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.3111486571852624, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.4811460538701716, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(euler_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.11299));
-   expected_results.push_back(make_pair(5, 0.113633));
+void tests_prep_dna_9() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep(qrycounts, refcounts, qrymarkov, refmarkov, 9, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_aa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(euler(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.49457, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.10369, 0.0001);
+    //FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), ???, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.989130434783, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.989130434783, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.00543, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.3105504265761406, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.4938153388000316, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(euler_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.114879));
-   expected_results.push_back(make_pair(4, 0.112743));
-   expected_results.push_back(make_pair(5, 0.112819));
-   expected_results.push_back(make_pair(6, 0.114044));
+/////////////////////////////////////////////////////////
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_raa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(euler(refcounts, qrycounts), result.second, 0.0001);
-   }
+void tests_prep_aa_3() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep_aa(qrycounts, refcounts, qrymarkov, refmarkov, 3, 0);
+
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.47198, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.11299, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 1.91489, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.943343, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.957447, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.0169492, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.377069, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.497807, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(manhattan_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.63265));
-   expected_results.push_back(make_pair(5, 1.45833));
+void tests_prep_aa_4() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep_aa(qrycounts, refcounts, qrymarkov, refmarkov, 4, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(manhattan(refcounts, qrycounts), result.second, 0.0001);
-   }
+    //FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), ???, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.379908, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.500178, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(manhattan_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 1.91489));
-   expected_results.push_back(make_pair(5, 2));
+void tests_prep_aa_5() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep_aa(qrycounts, refcounts, qrymarkov, refmarkov, 5, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_aa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(manhattan(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.5, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.113633, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 2, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 1, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 1, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.00862069, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.391587, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.500023, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(manhattan_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 1.42243));
-   expected_results.push_back(make_pair(4, 1.83761));
-   expected_results.push_back(make_pair(5, 1.95708));
-   expected_results.push_back(make_pair(6, 2));
+void tests_prep_aa_6() {
+    std::vector<unsigned> qrycounts, refcounts;
+    prep_aa(qrycounts, refcounts, 6);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_raa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(manhattan(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.5, 0.0001);
+    //FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), ???, 0.0001);
+    //FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), ???, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(bc_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.316326530612));
-   expected_results.push_back(make_pair(5, 0.729166666667));
-   expected_results.push_back(make_pair(7, 0.957446808511));
-   expected_results.push_back(make_pair(9, 0.989130434783));
+/////////////////////////////////////////////////////////
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(bray_curtis_distance(refcounts, qrycounts), result.second, 0.0001);
-   }
+void tests_prep_raa_3() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep_raa(qrycounts, refcounts, qrymarkov, refmarkov, 3, 0);
+
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.301479, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.114879, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 1.42243, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.72238, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.791489, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.0254237, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.449371, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.49648, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(bc_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.943343));
-   expected_results.push_back(make_pair(5, 1));
+void tests_prep_raa_4() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep_raa(qrycounts, refcounts, qrymarkov, refmarkov, 4, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_aa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(bray_curtis_distance(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.445397, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.112743, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 1.83761, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.903134, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.92735, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.017094, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.391654, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.502855, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(bc_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.72238));
-   expected_results.push_back(make_pair(4, 0.903134));
-   expected_results.push_back(make_pair(5, 0.971347));
-   expected_results.push_back(make_pair(6, 1));
+void tests_prep_raa_5() {
+    std::vector<unsigned> qrycounts, refcounts;
+    std::vector<double> qrymarkov, refmarkov;
+    prep_raa(qrycounts, refcounts, qrymarkov, refmarkov, 5, 0);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_raa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(bray_curtis_distance(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.484987, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.112819, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 1.95708, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 0.971347, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 0.978541, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.0172414, 0.0001);
+
+    FAIL_IF_NOT_WITHIN(d2s(refcounts, qrycounts, refmarkov, qrymarkov), 0.367139, 0.0001);
+    FAIL_IF_NOT_WITHIN(d2star(refcounts, qrycounts, refmarkov, qrymarkov), 0.499936, 0.0001);
 }
 
-SEQAN_DEFINE_TEST(ngd_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.316326530612));
-   expected_results.push_back(make_pair(5, 0.729166666667));
-   expected_results.push_back(make_pair(7, 0.957446808511));
-   expected_results.push_back(make_pair(9, 0.989130434783));
+void tests_prep_raa_6() {
+    std::vector<unsigned> qrycounts, refcounts;
+    prep_raa(qrycounts, refcounts, 6);
 
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(normalised_google_distance(refcounts, qrycounts), result.second, 0.0001);
-   }
+    FAIL_IF_NOT_WITHIN(d2(refcounts, qrycounts), 0.5, 0.0001);
+    FAIL_IF_NOT_WITHIN(euler(refcounts, qrycounts), 0.114044, 0.0001);
+    FAIL_IF_NOT_WITHIN(manhattan(refcounts, qrycounts), 2.0, 0.0001);
+    FAIL_IF_NOT_WITHIN(bray_curtis_distance(refcounts, qrycounts), 1, 0.0001);
+    FAIL_IF_NOT_WITHIN(normalised_google_distance(refcounts, qrycounts), 1, 0.0001);
+    FAIL_IF_NOT_WITHIN(chebyshev(refcounts, qrycounts), 0.00869565, 0.0001);
 }
-
-SEQAN_DEFINE_TEST(ngd_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.957447));
-   expected_results.push_back(make_pair(5, 1));
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_aa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(normalised_google_distance(refcounts, qrycounts), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(ngd_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.791489));
-   expected_results.push_back(make_pair(4, 0.92735));
-   expected_results.push_back(make_pair(5, 0.978541));
-   expected_results.push_back(make_pair(6, 1));
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_raa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(normalised_google_distance(refcounts, qrycounts), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(chebyshev_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.03061));
-   expected_results.push_back(make_pair(5, 0.01042));
-   expected_results.push_back(make_pair(7, 0.00532));
-   expected_results.push_back(make_pair(9, 0.00543));
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(chebyshev(refcounts, qrycounts), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(chebyshev_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.0169492));
-   expected_results.push_back(make_pair(5, 0.00862069));
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_aa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(chebyshev(refcounts, qrycounts), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(chebyshev_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.0254237));
-   expected_results.push_back(make_pair(4, 0.017094));
-   expected_results.push_back(make_pair(5, 0.0172414));
-   expected_results.push_back(make_pair(6, 0.00869565));
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      prep_raa(qrycounts, refcounts, result.first);
-      SEQAN_ASSERT_IN_DELTA(chebyshev(refcounts, qrycounts), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(d2s_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.43246389442301436));
-   expected_results.push_back(make_pair(5, 0.3808187760303444));
-   expected_results.push_back(make_pair(7, 0.3111486571852624));
-   expected_results.push_back(make_pair(9, 0.3105504265761406));
-
-   unsigned markovOrder = 0;
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      String<double> qrymarkov, refmarkov;
-      prep(qrycounts, refcounts, qrymarkov, refmarkov, result.first, markovOrder);
-      SEQAN_ASSERT_IN_DELTA(d2s(refcounts, qrycounts, refmarkov, qrymarkov), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(d2s_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.377069));
-   expected_results.push_back(make_pair(4, 0.379908));
-   expected_results.push_back(make_pair(5, 0.391587));
-
-   unsigned markovOrder = 0;
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      String<double> qrymarkov, refmarkov;
-      prep_aa(qrycounts, refcounts, qrymarkov, refmarkov, result.first, markovOrder);
-      SEQAN_ASSERT_IN_DELTA(d2s(refcounts, qrycounts, refmarkov, qrymarkov), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(d2s_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.449371));
-   expected_results.push_back(make_pair(4, 0.391654));
-   expected_results.push_back(make_pair(5, 0.367139));
-
-   unsigned markovOrder = 0;
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      String<double> qrymarkov, refmarkov;
-      prep_raa(qrycounts, refcounts, qrymarkov, refmarkov, result.first, markovOrder);
-      SEQAN_ASSERT_IN_DELTA(d2s(refcounts, qrycounts, refmarkov, qrymarkov), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(d2star_dna)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.4027100011247771));
-   expected_results.push_back(make_pair(5, 0.4333069320392635));
-   expected_results.push_back(make_pair(7, 0.4811460538701716));
-   expected_results.push_back(make_pair(9, 0.4938153388000316));
-
-   unsigned markovOrder = 0;
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      String<double> qrymarkov, refmarkov;
-      prep(qrycounts, refcounts, qrymarkov, refmarkov, result.first, markovOrder);
-      SEQAN_ASSERT_IN_DELTA(d2star(refcounts, qrycounts, refmarkov, qrymarkov), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(d2star_aa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.497807));
-   expected_results.push_back(make_pair(4, 0.500178));
-   expected_results.push_back(make_pair(5, 0.500023));
-
-   unsigned markovOrder = 0;
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      String<double> qrymarkov, refmarkov;
-      prep_aa(qrycounts, refcounts, qrymarkov, refmarkov, result.first, markovOrder);
-      SEQAN_ASSERT_IN_DELTA(d2star(refcounts, qrycounts, refmarkov, qrymarkov), result.second, 0.0001);
-   }
-}
-
-SEQAN_DEFINE_TEST(d2star_raa)
-{
-   vector<pair<unsigned int, double>> expected_results;
-   expected_results.push_back(make_pair(3, 0.49648));
-   expected_results.push_back(make_pair(4, 0.502855));
-   expected_results.push_back(make_pair(5, 0.499936));
-
-   //unsigned markovOrder = 1;
-   unsigned markovOrder = 0;
-
-   for(pair<unsigned int, double> result : expected_results)
-   {
-      String<unsigned> qrycounts, refcounts;
-      String<double> qrymarkov, refmarkov;
-      prep_raa(qrycounts, refcounts, qrymarkov, refmarkov, result.first, markovOrder);
-      SEQAN_ASSERT_IN_DELTA(d2star(refcounts, qrycounts, refmarkov, qrymarkov), result.second, 0.0001);
-   }
-}
-
