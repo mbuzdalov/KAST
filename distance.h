@@ -50,4 +50,4 @@ double hao(std::vector<unsigned> const &kmerCounts1,
            std::vector<double> const &markovCounts1,
            std::vector<double> const &markovCounts2);
 
-#endif
+#endif // __KAST_DISTANCE_H__
