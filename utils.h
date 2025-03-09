@@ -284,6 +284,30 @@ unsigned rank_of_char_as(char ch) {
 }
 
 /*
+ * Prepares a sequence for further processing given the k-mer length.
+ * Does nothing by default.
+ */
+template <seqan3::writable_alphabet T>
+void prepare_sequence_inplace(std::vector<T> &sequence, unsigned k) {}
+
+/*
+ * Prepares a sequence for further processing given the k-mer length.
+ * For seqan3::dna5, turns it into a reverse complement and inserts k 'N' symbols between.
+ */
+template <>
+void prepare_sequence_inplace(std::vector<seqan3::dna5> &sequence, unsigned k) {
+    size_t initial_length = sequence.size();
+    sequence.reserve(2 * initial_length + k);
+    auto N = seqan3::dna5{}.assign_char('N');
+    for (unsigned i = 0; i < k; ++i) {
+        sequence.push_back(N);
+    }
+    while (initial_length) {
+        sequence.push_back(sequence[--initial_length].complement());
+    }
+}
+
+/*
 I need to check that if we are using skip-mers, then we need to check that these are sensible.
   * skip-mer mask must all be 0/1's
   * skip-mer mask should be the same number of characters as the kmer size
@@ -664,4 +688,4 @@ int countReducedAlphabet(String<unsigned> & kmerCounts, String<TAlphabet> const 
 
 */
 
-#endif
+#endif // __KAST_UTILS_H__
