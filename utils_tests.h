@@ -1,5 +1,9 @@
+#ifndef __KAST_UTILS_TESTS_H__
+#define __KAST_UTILS_TESTS_H__
+
 #include <algorithm>
 #include <seqan3/alphabet/all.hpp>
+#include <seqan3/core/debug_stream.hpp>
 #include "utils.h"
 
 using namespace seqan3::literals;
@@ -68,3 +72,5 @@ void raa_masked_single_bit() {
     FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa10murphy>('P')]);
     FAIL_IF_NOT_EQUAL(1, counts[rank_of_char_as<seqan3::aa10murphy>('S')]);
 }
+
+#endif // __KAST_UTILS_TESTS_H__
