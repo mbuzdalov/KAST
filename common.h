@@ -2,6 +2,7 @@
 #define __KAST_COMMON_H__
 
 #include <string>
+#include <vector>
 
 /*
 User defined options struct

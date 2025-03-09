@@ -2,6 +2,8 @@
 #include "utils_tests.h"
 
 int main() {
+    split_by_space_tests();
+
     dna5_masked_single_bit();
     aa_masked_single_bit();
     raa_masked_single_bit();

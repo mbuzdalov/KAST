@@ -2,6 +2,7 @@
 #define __KAST_UTILS_TESTS_H__
 
 #include <algorithm>
+#include <sstream>
 #include <seqan3/alphabet/all.hpp>
 #include <seqan3/core/debug_stream.hpp>
 #include "utils.h"
@@ -17,6 +18,35 @@ using namespace seqan3::literals;
     } else { \
         seqan3::debug_stream << "Test " << __func__ << "/" << #found << " OK" << std::endl; \
     } \
+}
+
+std::string split_by_space_test(std::string const &orig, std::vector<std::string> const &expected) {
+    std::vector<std::string> found = split_by_space(orig);
+    if (expected.size() != found.size()) {
+        std::ostringstream oss;
+        oss << "Sizes are not equal: expected " << expected.size() << " found " << found.size();
+        return oss.str();
+    }
+    for (size_t i = 0; i < expected.size(); ++i) {
+        if (expected[i] != found[i]) {
+            std::ostringstream oss;
+            oss << "Results at index " << i << " are not equal: expected " << expected[i] << " found " << found[i];
+            return oss.str();
+        }
+    }
+    return "OK";
+}
+
+void split_by_space_tests() {
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("", {}));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("    ", {}));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("\t\t  \t\t\n", {}));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("A", { "A" }));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("  A", { "A" }));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("A  ", { "A" }));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("\tA\t", { "A" }));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("  AAA  BBB CCC\tDDD\nEEEE\t\t\t", { "AAA", "BBB", "CCC", "DDD", "EEEE" }));
+    FAIL_IF_NOT_EQUAL("OK", split_by_space_test("A B C D E F 0", { "A", "B", "C", "D", "E", "F", "0" }));
 }
 
 void dna5_masked_single_bit() {
