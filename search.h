@@ -68,9 +68,6 @@ void print_result(modify_string_options const &options,
     }
 }
 
-template<seqan3::alphabet T>
-using sequence_file_type = seqan3::sequence_file_input<typename input_traits<T>::traits_type>;
-
 template <seqan3::alphabet T>
 struct mt_record_reader {
     std::mutex lock;
@@ -94,27 +91,6 @@ struct mt_record_reader {
         }
     }
 };
-
-template <seqan3::writable_alphabet T>
-void populate_counts(modify_string_options const &options, std::vector<T> const &sequence,
-                     std::vector<unsigned> &counts, std::vector<double> &markov_counts) {
-    if (options.mask.size()) {
-        count_kmers(counts, sequence, options.klen, options.effective_length, options.mask);
-    } else {
-        count_kmers(counts, sequence, options.klen);
-    }
-
-    if (options.type == "d2s" || options.type == "D2S" ||
-        options.type == "d2star" || options.type == "D2Star" ||
-        options.type == "hao" || options.type == "dai")
-    {
-        if (options.mask.size()) {
-            markov(markov_counts, sequence, options.effective_length, options.markov_order);
-        } else {
-            markov(markov_counts, sequence, options.klen, options.markov_order);
-        }
-    }
-}
 
 template <seqan3::writable_alphabet T>
 int search_thread(modify_string_options const &options,
@@ -155,20 +131,7 @@ int search_thread(modify_string_options const &options,
                 }
             }
 
-            double dist = 0;
-            if (options.type == "euclid")           dist = euler(querycounts, refcounts[i]);
-            else if (options.type == "d2")          dist = d2(querycounts, refcounts[i]);
-            else if (options.type == "cosine")      dist = cosine(querycounts, refcounts[i]);
-            else if (options.type == "manhattan")   dist = manhattan(querycounts, refcounts[i]);
-            else if (options.type == "chebyshev")   dist = chebyshev(querycounts, refcounts[i]);
-            else if (options.type == "canberra")    dist = canberra(querycounts, refcounts[i]);
-            else if (options.type == "normalised_canberra") dist = normalised_canberra(querycounts, refcounts[i]);
-            else if (options.type == "bc")                  dist = bray_curtis_distance(querycounts, refcounts[i]);
-            else if (options.type == "ngd")                 dist = normalised_google_distance(querycounts, refcounts[i]);
-            else if (options.type == "d2s" || options.type == "D2S")    dist = d2s(querycounts, refcounts[i], querymarkov, markovcounts[i]);
-            else if (options.type == "hao")                             dist = hao(querycounts, refcounts[i], querymarkov, markovcounts[i]);
-            else if (options.type == "d2star" || options.type == "D2Star") dist = d2star(querycounts, refcounts[i], querymarkov, markovcounts[i]);
-            else if (options.type == "dai")                                dist = dai(querycounts, refcounts[i], querymarkov, markovcounts[i]);
+            double dist = distance_dispatch(options.type, querycounts, refcounts[i], querymarkov, markovcounts[i]);
 
             // stores the smallest distance results and corresponding location in refSeq
             /*
@@ -212,7 +175,9 @@ int query_ref_search(modify_string_options const &options) {
     }
 
     // check how much RAM is required to store the reference
-    //if(mem_check(options, refseqs.size(), alphabetType) == 1)
+    // this check is actually quite useless since there are multiple copies running
+    // so we need to replace it with something better
+    // if(mem_check(options, refseqs.size(), alphabetType) == 1)
     //    return 1;
 
     std::vector<std::vector<unsigned>> counts;
@@ -248,11 +213,11 @@ int query_ref_search(modify_string_options const &options) {
 
     auto outfile_ref = options.output_filename == "" ? std::ref(std::cout) : std::ref(outfile);
     for (unsigned i = 0; i < options.num_threads; ++i) {
-        worker_threads.push_back(std::thread(search_thread<T>,
+        worker_threads.emplace_back(search_thread<T>,
             std::ref(options), std::ref(qryseq_reader),
             std::ref(refids), std::ref(refseqs), std::ref(counts), std::ref(markov_counts),
             std::ref(write_lock), outfile_ref
-        ));
+        );
     }
 
     for (auto &th : worker_threads) {

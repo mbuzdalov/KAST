@@ -37,7 +37,7 @@ add_definitions (${SEQAN3_DEFINITIONS})
 
 # -Wno-interference-size: the interference size warning is triggered by seqan3/contrib/parallel/buffer_queue.hpp,
 #                         and it is not something I can deal with.
-set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS} -Wno-interference-size")
+set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS} -Wno-interference-size -O3")
 
 # Add executable and link against SeqAn dependencies.
 add_executable (kast utils.cpp distance.cpp kast.cpp)

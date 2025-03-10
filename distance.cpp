@@ -170,6 +170,8 @@ double cosine(std::vector<unsigned> const &kmerCounts1,
       sumrC2  += (uint64_t) (kmerCounts2[i]) * (uint64_t) (kmerCounts2[i]);
    }
 
+   // this cannot physically be greater than 1,
+   // but because of the floating-point rounding, sometimes it is.
    double score = sumqCrC / (sqrt(sumqC2) * sqrt(sumrC2));
    return 1 - score;
 }

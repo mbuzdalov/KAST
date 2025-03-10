@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "distance.h"
 
 /*
 I need to check that if we are using skip-mers, then we need to check that these are sensible.
@@ -240,4 +241,26 @@ void markov<>(std::vector<double> &markov_counts,
          }
       }
    }
+}
+
+
+double distance_dispatch(std::string const &type,
+                         std::vector<unsigned> const &counts_l, std::vector<unsigned> const &counts_r,
+                         std::vector<double> const &markov_l, std::vector<double> const &markov_r) {
+    if (type == "euclid")           return euler(counts_l, counts_r);
+    else if (type == "d2")          return d2(counts_l, counts_r);
+    else if (type == "cosine")      return cosine(counts_l, counts_r);
+    else if (type == "manhattan")   return manhattan(counts_l, counts_r);
+    else if (type == "chebyshev")   return chebyshev(counts_l, counts_r);
+    else if (type == "canberra")    return canberra(counts_l, counts_r);
+    else if (type == "normalised_canberra")     return normalised_canberra(counts_l, counts_r);
+    else if (type == "bc")                      return bray_curtis_distance(counts_l, counts_r);
+    else if (type == "ngd")                     return normalised_google_distance(counts_l, counts_r);
+    else if (type == "d2s" || type == "D2S")    return d2s(counts_l, counts_r, markov_l, markov_r);
+    else if (type == "hao")                         return hao(counts_l, counts_r, markov_l, markov_r);
+    else if (type == "d2star" || type == "D2Star")  return d2star(counts_l, counts_r, markov_l, markov_r);
+    else if (type == "dai")                         return dai(counts_l, counts_r, markov_l, markov_r);
+
+    seqan3::debug_stream << "Error: distance_dispatch does not know distance type '" << type << "'" << std::endl;
+    exit(1);
 }

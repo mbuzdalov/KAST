@@ -14,21 +14,22 @@
 
 #include "common.h"
 #include "utils.h"
-//#include "pairwise.h"
+#include "pairwise.h"
 #include "search.h"
 
 template <seqan3::writable_alphabet T>
 int templated_main(modify_string_options const &options) {
     if (options.pairwise_filename != "" && options.type != "all" && options.type != "new") {
         // Running in pairwise mode
-        return 1;//pairwise_matrix<T>(options);
+        return pairwise_matrix<T>(options);
     } else if (options.pairwise_filename != "" && options.type == "all")  {
         // Running in pairwise all mode
-        return 1;//pairwise_all_matrix<T>(options);
+        return pairwise_all_matrix<T>(options);
     } else if (options.interleaved_filename != "") {
         // Running in interleaved mode
-        return 1;//interleaved<T>(options);
+        return interleaved<T>(options);
     } else if (options.reference_filename != "" && options.query_filename != "") {
+        // Running in query/reference mode
         return query_ref_search<T>(options);
     } else {
         seqan3::debug_stream << "Error: unknown configuration!" << std::endl;

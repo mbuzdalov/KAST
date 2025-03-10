@@ -8,13 +8,42 @@
 #include <vector>
 #include <unordered_map>
 
+#include <sys/sysinfo.h> // eventually for memory checking
+
 #include <seqan3/alphabet/all.hpp>
 #include <seqan3/argument_parser/all.hpp>
 #include <seqan3/core/debug_stream.hpp>
+#include <seqan3/io/sequence_file/input.hpp>
 #include <seqan3/search/kmer_index/shape.hpp>
 #include <seqan3/search/views/kmer_hash.hpp>
 #include <seqan3/utility/math.hpp>
 #include <seqan3/utility/views/all.hpp>
+
+template <seqan3::writable_alphabet T>
+struct input_traits {};
+
+template<>
+struct input_traits<seqan3::dna5> {
+    using traits_type = seqan3::sequence_file_input_default_traits_dna;
+};
+
+template<>
+struct input_traits<seqan3::aa27> {
+    using traits_type = seqan3::sequence_file_input_default_traits_aa;
+};
+
+struct sequence_file_input_default_traits_aa10 : seqan3::sequence_file_input_default_traits_aa {
+    using sequence_alphabet = seqan3::aa10murphy;
+    using sequence_legal_alphabet = seqan3::aa27;
+};
+
+template<>
+struct input_traits<seqan3::aa10murphy> {
+    using traits_type = sequence_file_input_default_traits_aa10;
+};
+
+template<seqan3::alphabet T>
+using sequence_file_type = seqan3::sequence_file_input<typename input_traits<T>::traits_type>;
 
 /*
  * Returns the index of a char, assuming it is from the specified alphabet.
@@ -78,6 +107,11 @@ double gc_ratio(std::vector<T> const &sequence) {
    double at = count[rank_of_char_as<T>('A')]
              + count[rank_of_char_as<T>('T')];
    return gc / (gc + at);
+}
+
+template <seqan3::alphabet T>
+double gc_ratio(std::vector<T> const &sequence) {
+    return 0; // makes no sense for non-nucleotide alphabets, but is required by search printers
 }
 
 /*
@@ -201,6 +235,32 @@ void markov<>(std::vector<double> &markov_counts,
               std::vector<seqan3::dna5> const &sequence,
               unsigned const k,
               unsigned const markov_order);
+
+template <seqan3::writable_alphabet T>
+void populate_counts(modify_string_options const &options, std::vector<T> const &sequence,
+                     std::vector<unsigned> &counts, std::vector<double> &markov_counts) {
+    if (options.mask.size()) {
+        count_kmers(counts, sequence, options.klen, options.effective_length, options.mask);
+    } else {
+        count_kmers(counts, sequence, options.klen);
+    }
+
+    if (options.type == "d2s" || options.type == "D2S" ||
+        options.type == "d2star" || options.type == "D2Star" ||
+        options.type == "hao" || options.type == "dai")
+    {
+        if (options.mask.size()) {
+            markov(markov_counts, sequence, options.effective_length, options.markov_order);
+        } else {
+            markov(markov_counts, sequence, options.klen, options.markov_order);
+        }
+    }
+}
+
+double distance_dispatch(std::string const &type,
+                         std::vector<unsigned> const &counts_l, std::vector<unsigned> const &counts_r,
+                         std::vector<double> const &markov_l, std::vector<double> const &markov_r);
+
 
 /// Experimental idea
 
