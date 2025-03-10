@@ -1,5 +1,3 @@
-[![Build Status](https://travis-ci.org/martinjvickers/KAST.svg?branch=master)](https://travis-ci.org/martinjvickers/KAST)
-
 # Summary #
 
 Perform Alignment-free k-tuple frequency comparisons from sequences. This can be in the form of two input files (e.g. a reference and a query) or a single file for pairwise comparisons to be made.
@@ -54,4 +52,4 @@ The current binary release has been built on Ubuntu LTS 20.04. If there is suffi
 
 ### Who do I talk to? ###
 
-* Martin Vickers (martinj.vickers@gmail.com)
+* Maxim Buzdalov (mab168@aber.ac.uk)
