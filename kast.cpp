@@ -14,20 +14,20 @@
 
 #include "common.h"
 #include "utils.h"
-#include "pairwise.h"
+//#include "pairwise.h"
 #include "search.h"
 
 template <seqan3::writable_alphabet T>
 int templated_main(modify_string_options const &options) {
     if (options.pairwise_filename != "" && options.type != "all" && options.type != "new") {
         // Running in pairwise mode
-        return pairwise_matrix<T>(options);
+        return 1;//pairwise_matrix<T>(options);
     } else if (options.pairwise_filename != "" && options.type == "all")  {
         // Running in pairwise all mode
-        return pairwise_all_matrix<T>(options);
+        return 1;//pairwise_all_matrix<T>(options);
     } else if (options.interleaved_filename != "") {
         // Running in interleaved mode
-        return interleaved<T>(options);
+        return 1;//interleaved<T>(options);
     } else if (options.reference_filename != "" && options.query_filename != "") {
         return query_ref_search<T>(options);
     } else {
@@ -38,193 +38,103 @@ int templated_main(modify_string_options const &options) {
 
 // Parse our commandline options
 bool parse_command_line(modify_string_options &options, int argc, char const ** argv) {
-   seqan3::argument_parser parser{"kast", argc, argv};
+   seqan3::argument_parser parser{"kast", argc, argv, seqan3::update_notifications::off};
    parser.info.version = "1.0.3beta";
    parser.info.date = "Mar 2025";
-   //parser.short_description = "Kmer Alignment-free Search Tool";
-   parser.add_line("Perform Alignment-free k-tuple frequency comparisons from sequences.");
-   parser.add_line("This can be in the form of two input files (e.g. a reference and a query):");
-   parser.add_line("   -q query.fasta -r reference.fasta -o results.txt [\\fIOPTIONS\\fP] ");
-   parser.add_line("or a single file for pairwise comparisons to be made:");
-   parser.add_line("   -p mydata.fasta -o results.txt [\\fIOPTIONS\\fP] ");
+   parser.info.short_description = "Kmer Alignment-free Search Tool";
+   parser.info.description.push_back("Perform Alignment-free k-tuple frequency comparisons from sequences.\n"
+                                     "This can be in the form of two input files (e.g. a reference and a query):");
+   parser.info.description.push_back("\t-q query.fasta -r reference.fasta -o results.txt [\\fIOPTIONS\\fP] ");
+   parser.info.description.push_back("or a single file for pairwise comparisons to be made:");
+   parser.info.description.push_back("\t-p mydata.fasta -o results.txt [\\fIOPTIONS\\fP] ");
 
-   //addOption(parser, ArgParseOption("k", "klen", "Kmer Length.",
-   //                                 ArgParseArgument::INTEGER, "INT"));
-   //setDefaultValue(parser, "klen", "3");
-   //getOptionValue(options.klen, parser, "klen");
-   options.klen = 3; //default
-   parser.add_option(options.klen, 'k', "klen", "Kmer Length");
+   parser.add_subsection("Application-specific options:"); // because seqan adds its "Basic options" before everything else
 
-   //addOption(parser, ArgParseOption("d", "debug", "Debug Messages."));
-   //options.debug = isSet(parser, "debug");
+   options.klen = 3;
+   parser.add_option(options.klen, 'k', "klen", "Kmer length.");
+
    options.debug = false;
-   parser.add_flag(options.debug, 'd', "debug", "Debug Messages");
+   parser.add_flag(options.debug, 'd', "debug", "Enable debug messages.");
 
-   //addOption(parser, ArgParseOption("q", "query-file",
-   //                                 "Path to the file containing your query \
-   //                                 sequence data.\n",
-   //                                 ArgParseArgument::INPUT_FILE, "IN"));
-   //getOptionValue(options.queryFileName, parser, "query-file");
    options.query_filename = "";
    parser.add_option(options.query_filename, 'q', "query-file",
-        "Path to the file containing your query sequence data");
+        "Path to the file containing your query sequence data.");
 
-   //addOption(parser, ArgParseOption("r", "reference-file",
-   //                                 "Path to the file containing your reference\
-   //                                  sequence data.",
-   //                                  ArgParseArgument::INPUT_FILE, "IN"));
-   //getOptionValue(options.referenceFileName, parser, "reference-file");
    options.reference_filename = "";
    parser.add_option(options.reference_filename, 'r', "reference-file",
-        "Path to the file containing your reference sequence data");
+        "Path to the file containing your reference sequence data.");
 
-   //addOption(parser, ArgParseOption("p", "pairwise-file",
-   //                                 "Path to the file containing your sequence \
-   //                                 data which you will perform pairwise \
-   //                                 comparison on.",
-   //                                 ArgParseArgument::INPUT_FILE, "IN"));
-   //getOptionValue(options.pairwiseFileName, parser, "pairwise-file");
    options.pairwise_filename = "";
    parser.add_option(options.pairwise_filename, 'p', "pairwise-file",
-        "Path to the file containing your sequence data which you will perform pairwise comparison on");
+        "Path to the file containing your sequence data which you will perform pairwise comparison on.");
 
-   //addOption(parser, ArgParseOption("i", "interleaved-file",
-   //                                 "Path to the file containing your sequence \
-   //                                 data which is interleaved.",
-   //                                 ArgParseArgument::INPUT_FILE, "IN"));
-   //getOptionValue(options.interleavedFileName, parser, "interleaved-file");
    options.interleaved_filename = "";
    parser.add_option(options.interleaved_filename, 'i', "interleaved-file",
-        "Path to the file containing your sequence data which is interleaved");
+        "Path to the file containing your sequence data which is interleaved.");
 
-   //setDefaultValue(parser, "markov-order", "0");
-   //addOption(parser, ArgParseOption("m", "markov-order", "Markov Order",
-   //          ArgParseArgument::INTEGER, "INT"));
-   //getOptionValue(options.markovOrder, parser, "markov-order");
    options.markov_order = 0;
-   parser.add_option(options.markov_order, 'm', "markov-order", "Markov Order");
+   parser.add_option(options.markov_order, 'm', "markov-order", "Markov order.");
 
-   //addOption(parser, ArgParseOption("o", "output-file", "Output file.",
-   //          ArgParseArgument::OUTPUT_FILE, "OUT"));
-   //getOptionValue(options.outputFileName, parser, "output-file");
    options.output_filename = "";
-   parser.add_option(options.output_filename, 'o', "output-file", "Output file");
+   parser.add_option(options.output_filename, 'o', "output-file", "Output file.");
 
-   //addOption(parser, ArgParseOption("n", "num-hits",
-   //          "Number of top hits to return when running a Ref/Query search.\
-   //           If you want all the result, enter 0.", ArgParseArgument::INTEGER, "INT"));
-   //setDefaultValue(parser, "num-hits", "10");
-   //getOptionValue(options.nohits, parser, "num-hits");
    options.nohits = 10;
    parser.add_option(options.nohits, 'n', "num-hits",
-        "Number of top hits to return when running a Ref/Query search. If you want all the results, enter 0");
+        "Number of top hits to return when running a Ref/Query search. If you want all the results, enter 0.");
 
-   //addOption(parser, ArgParseOption("t", "distance-type",
-   //                                 "The method of calculating the distance \
-   //                                 between two sequences. For descriptions of \
-   //                                 distance please refer to the wiki. ",
-   //                                 ArgParseArgument::STRING, "STR"));
-   //setValidValues(parser, "distance-type",
-   //setDefaultValue(parser, "distance-type", "d2");
-   //getOptionValue(options.type, parser, "distance-type");
    seqan3::value_list_validator<std::string> type_values {
         "d2", "euclid", "d2s", "d2star", "manhattan", "chebyshev",
         "dai", "bc", "ngd", "all", "canberra", "normalised_canberra", "cosine"
    };
+
    options.type = "d2";
    parser.add_option(options.type, 't', "distance-type",
         "The method of calculating the distance between two sequences. "
-        "For descriptions of distance please refer to the wiki", seqan3::option_spec::standard, type_values);
+        "For descriptions of distance please refer to the wiki.", seqan3::option_spec::standard, type_values);
 
-   //addOption(parser, ArgParseOption("sc", "score-cutoff", "Score Cutoff for search mode.",
-   //          ArgParseArgument::DOUBLE, "DOUBLE"));
-   //if(isSet(parser, "score-cutoff") == false)
-   //{
-   //   options.score_cutoff = std::numeric_limits<double>::quiet_NaN();
-   //}
-   //getOptionValue(options.score_cutoff, parser, "score-cutoff");
+   // this used to be 'sc' for the short option, which is impossible in this parser
    options.score_cutoff = std::numeric_limits<double>::quiet_NaN();
-   parser.add_option(options.score_cutoff, 'S', "score-cutoff", "Score Cutoff for search mode");
+   parser.add_option(options.score_cutoff, 'S', "score-cutoff", "Score Cutoff for search mode.");
 
-   //addOption(parser, ArgParseOption("s", "sequence-type",
-   //          "Define the type of sequence data to work with.",
-   //          ArgParseArgument::STRING, "STR"));
-   //setValidValues(parser, "sequence-type", "dna aa raa");
-   //setDefaultValue(parser, "sequence-type", "dna");
-   //getOptionValue(options.sequenceType, parser, "sequence-type");
    seqan3::value_list_validator<std::string> sequence_type_values { "dna", "aa", "raa" };
    options.sequence_type = "dna";
    parser.add_option(options.sequence_type, 's', "sequence-type",
-        "The type of sequence data to work with", seqan3::option_spec::standard, sequence_type_values);
+        "The type of sequence data to work with.", seqan3::option_spec::standard, sequence_type_values);
 
-
-   //addOption(parser, ArgParseOption("f", "output-format",
-   //          "For Reference/query based usage you can select your output type.",
-   //          ArgParseArgument::STRING, "STR"));
-   //getOptionValue(options.output_format, parser, "output-format");
-   //setValidValues(parser, "output-format", "default tabular blastlike");
-   //setDefaultValue(parser, "output-format", "default");
    seqan3::value_list_validator<std::string> output_format_values { "default", "tabular", "blastlike" };
    options.output_format = "default";
    parser.add_option(options.output_format, 'f', "output-format",
-        "The output type for Reference/query based usage", seqan3::option_spec::standard, output_format_values);
+        "The output type for Reference/query based usage.", seqan3::option_spec::standard, output_format_values);
 
-   //addOption(parser, ArgParseOption("nr", "no-reverse",
-   //          "Do not use reverse compliment."));
-   //options.noreverse = isSet(parser, "no-reverse");
+   // this used to be 'nr' for the short option, which is impossible in this parser
    options.noreverse = false;
    parser.add_flag(options.noreverse, 'N', "no-reverse",
-        "Do not use reverse compliment");
+        "Do not use reverse complement for DNA sequences (ignored for other sequence types).");
 
-   //addOption(parser, ArgParseOption("gc", "calc-gc",
-   //          "Calculate GC content of query/ref in search mode."));
-   //options.calcgc = isSet(parser, "calc-gc");
+   // this used to be 'gc' for the short option, which is impossible in this parser
    options.calcgc = false;
    parser.add_flag(options.calcgc, 'G', "calc-gc",
-        "Calculate GC content of query/ref in search mode");
+        "Calculate GC content of query/ref in search mode (ignored for non-DNA sequence types).");
 
-   //addOption(parser, ArgParseOption("nh", "no-header",
-   //          "Do not print header when performing search mode."));
-   //options.noheader = isSet(parser, "no-header");
+   // this used to be 'nh' for the short option, which is impossible in this parser
    options.noheader = false;
    parser.add_flag(options.noheader, 'H', "no-header",
-        "Do not print header when performing search mode");
+        "Do not print header when performing search mode.");
 
-   //addOption(parser, ArgParseOption("mask", "skip-mer",
-   //          "Specify binary masks where a zero indicates \
-   //          skipping that base and one keeps it. e.g. 01110.",
-   //          ArgParseArgument::STRING, "TEXT", true));
-   //for(int i = 0; i < getOptionValueCount(parser, "skip-mer"); i++)
-   //{
-   //   CharString tmpVal;
-   //   getOptionValue(tmpVal, parser, "skip-mer", i);
-   //   options.mask.push_back(tmpVal);
-   //}
+   // this used to be 'mask' for the short option, which is impossible in this parser
    parser.add_option(options.mask, 'M', "skip-mer",
-        "Specify binary masks where a zero indicates skipping that base and one keeps it, e.g. 01110");
+        "Specify binary masks where a zero indicates skipping that base and one keeps it, e.g. 01110.");
 
-   //addOption(parser, ArgParseOption("c", "num-cores", "Number of Cores.",
-   //          ArgParseArgument::INTEGER, "INT"));
-   //setDefaultValue(parser, "num-cores", "1");
-   //getOptionValue(options.num_threads, parser, "num-cores");
    options.num_threads = 1;
-   parser.add_option(options.num_threads, 'c', "num-cores", "Number of cores");
+   parser.add_option(options.num_threads, 'c', "num-cores", "Number of CPU cores to use.");
 
-   //addOption(parser, ArgParseOption("fp", "filter-percent", "In search mode, only match\
-   //                                 those results where the query and ref sequence \
-   //                                 lengths are within +/- percentage of oneanother.",
-   //          ArgParseArgument::DOUBLE, "DOUBLE"));
-   //getOptionValue(options.filter_percent, parser, "filter-percent");
-   parser.add_option(options.filter_percent, '%', "filter-percent",
-        "In search mode, only match those results where the query and ref sequence lengths are within +/- percentage of one another");
+   // this used to be 'fp' for the short option, which is impossible in this parser
+   parser.add_option(options.filter_percent, 'P', "filter-percent",
+        "In search mode, only match those results where the query and ref sequence lengths are within +/- percentage of one another.");
 
-   //addOption(parser, ArgParseOption("fb", "filter-bp", "In search mode, only match\
-   //                                 those results where the query and ref sequence \
-   //                                 lengths are within +/- bp of oneanother.",
-   //          ArgParseArgument::INT64, "INT64"));
-   //getOptionValue(options.filter_bp, parser, "filter-bp");
+   // this used to be 'fb' for the short option, which is impossible in this parser
    parser.add_option(options.filter_bp, 'B', "filter-bp",
-        "In search mode, only match those results where the query and ref sequence lengths are within +/- bp of one another");
+        "In search mode, only match those results where the query and ref sequence lengths are within +/- bp of one another.");
 
    parser.parse();
 
@@ -242,21 +152,19 @@ bool parse_command_line(modify_string_options &options, int argc, char const ** 
 
       if (options.mask.size() > 0) {
          if (options.markov_order >= options.effective_length - 1) {
-            seqan3::debug_stream << "Markov order must be < effectiveLength-1 " << std::endl;
+            seqan3::debug_stream << "Markov order must be < effective length - 1 " << std::endl;
             return false;
          }
       } else {
          if (options.markov_order >= options.klen - 1) {
-            seqan3::debug_stream << "Markov order must be < klen-1 " << std::endl;
+            seqan3::debug_stream << "Markov order must be < klen - 1 " << std::endl;
             return false;
          }
       }
    }
 
-   if (parser.is_option_set("pairwise-file")) {
-      if (parser.is_option_set("reference-file") ||
-          parser.is_option_set("query-file"))
-      {
+   if (options.pairwise_filename != "") {
+      if (options.reference_filename != "" || options.query_filename != "") {
          seqan3::debug_stream << "If you are performing a pairwise comparison, "
                                  "you do not need to specify a query (-q) and a "
                                  "reference (-r) file. If you are performing a "
@@ -267,25 +175,24 @@ bool parse_command_line(modify_string_options &options, int argc, char const ** 
       }
    }
 
-   if (parser.is_option_set("reference-file") == true && !parser.is_option_set("query-file")) {
+   if (options.reference_filename != "" && options.query_filename == "") {
       seqan3::debug_stream << "You have specified a reference (-r) file but "
                               "not a query (-q) file. See kast -h for details." << std::endl;
       //printHelp(parser);
       return false;
    }
 
-   if (!parser.is_option_set("reference-file") && parser.is_option_set("query-file")) {
+   if (options.reference_filename == "" && options.query_filename != "") {
       seqan3::debug_stream << "You have specified a query (-q) file but "
                               "not a reference (-r) file. See kast -h for details." << std::endl;
       //printHelp(parser);
       return false;
    }
 
-   if (!parser.is_option_set("reference-file") &&
-       !parser.is_option_set("query-file") &&
-       !parser.is_option_set("pairwise-file") &&
-       !parser.is_option_set("interleaved-file"))
-   {
+   if (options.reference_filename == "" &&
+       options.query_filename == "" &&
+       options.pairwise_filename == "" &&
+       options.interleaved_filename == "") {
       seqan3::debug_stream << "You have not specifed any input file. "
                               "See kast -h for details." << std::endl;
       //printHelp(parser);

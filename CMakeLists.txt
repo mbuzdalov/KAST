@@ -31,11 +31,13 @@ include_directories (${SEQAN3_INCLUDE_DIRS})
 
 # Add definitions set by find_package (SeqAn).
 add_definitions (${SEQAN3_DEFINITIONS})
-add_definitions ( -DSEQAN3_NO_VERSION_CHECK )
 
 # Add CXX flags found by find_package (SeqAn).
 #set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS} -Wl,--whole-archive -lrt -pthread -lgomp -Wl,--no-as-needed -ldl")
-set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS}")
+
+# -Wno-interference-size: the interference size warning is triggered by seqan3/contrib/parallel/buffer_queue.hpp,
+#                         and it is not something I can deal with.
+set (CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} ${SEQAN3_CXX_FLAGS} -Wno-interference-size")
 
 # Add executable and link against SeqAn dependencies.
 add_executable (kast utils.cpp distance.cpp kast.cpp)
